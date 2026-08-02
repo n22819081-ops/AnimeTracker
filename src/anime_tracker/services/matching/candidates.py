@@ -87,7 +87,7 @@ def generate_match_candidates(
     warnings: list[str] = []
 
     for item in snapshot.items:
-        target_options = _targets_for_item(media, item, snapshot, desired_season)
+        target_options = _targets_for_item(media, item, snapshot, desired_season,session.inventory_snapshot_id)
         for target in target_options:
             exact_existing = any(mapping.target.identity_key == target.identity_key for mapping in current_confirmed_mappings)
             rejected, unstable_rejection = _rejection_effect(target, rejections, franchise_identity)
@@ -149,6 +149,7 @@ def _targets_for_item(
     item: InventoryLibraryItem,
     snapshot: ServerInventorySnapshot,
     desired_season: int | None,
+    snapshot_id: str,
 ) -> tuple[MappingTarget, ...]:
     root_path = next((root.root.path for root in snapshot.roots if root.root.label == item.root_label), "")
     relative = _relative(item.path, root_path)
@@ -158,7 +159,7 @@ def _targets_for_item(
         relative_path=relative,
         normalized_path=item.normalized_path,
         inventory_item_id=item.item_id,
-        inventory_snapshot_id=inventory_snapshot_id(snapshot),
+        inventory_snapshot_id=snapshot_id,
         display_name=item.title,
         path_state=PathState.EXISTS,
     )

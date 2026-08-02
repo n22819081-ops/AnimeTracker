@@ -66,6 +66,7 @@ class AnimeRow:
     aired_episodes: int | None = None
     present_episodes: int | None = None
     missing_episodes: tuple[int, ...] = ()
+    mapping_state: str = "Not mapped"
 
     @property
     def searchable(self) -> str:
@@ -115,17 +116,34 @@ class ModernRepository:
                        ts.tracker_status,ts.server_presence,ts.episode_coverage,
                        ts.review_status,ts.review_reason,
                        t.english,t.romaji,t.native,t.synonyms,
-                       m.target_type,m.season_number,m.display_name,m.relative_path,
-                       m.evidence_summary_json
+                       m.target_type,m.season_number,m.display_name,m.relative_path,m.path_state,
+                       m.evidence_summary_json,
+                       cv.server_presence calculated_presence,cv.coverage_json,
+                       suggestion.display_name suggestion_name,suggestion.relative_path suggestion_path,
+                       suggestion.confidence suggestion_confidence,suggestion.score suggestion_score
                   FROM tracked_media tm
                   JOIN anilist_media am ON am.anilist_id=tm.anilist_id
                   LEFT JOIN anilist_media_cache ac ON ac.anilist_id=tm.anilist_id
                   LEFT JOIN titles t ON t.anilist_id=tm.anilist_id
                   LEFT JOIN tracking_state ts ON ts.tracked_media_id=tm.id
-                  LEFT JOIN media_server_mappings m ON m.mapping_id=(
+                   LEFT JOIN media_server_mappings m ON m.mapping_id=(
                        SELECT mapping_id FROM media_server_mappings active_mapping
                         WHERE active_mapping.anilist_id=tm.anilist_id AND active_mapping.active=1
                         ORDER BY active_mapping.updated_at DESC LIMIT 1)
+                   LEFT JOIN coverage_mapping_snapshots cv ON cv.coverage_id=(
+                       SELECT coverage_id FROM coverage_mapping_snapshots current_coverage
+                        WHERE current_coverage.mapping_id=m.mapping_id
+                        ORDER BY current_coverage.created_at DESC LIMIT 1)
+                   LEFT JOIN server_match_candidates suggestion ON suggestion.candidate_id=(
+                       SELECT candidate.candidate_id FROM server_match_candidates candidate
+                       JOIN matching_sessions session ON session.session_id=candidate.session_id
+                        WHERE candidate.anilist_id=tm.anilist_id AND candidate.stale=0
+                          AND candidate.confidence IN ('VERY_STRONG','STRONG','POSSIBLE')
+                          AND NOT EXISTS (
+                              SELECT 1 FROM mapping_overrides decision
+                               WHERE decision.profile_id=candidate.profile_id AND decision.anilist_id=tm.anilist_id
+                                 AND decision.active=1 AND decision.decision_type IN ('NOT_ON_SERVER','NO_VALID_CANDIDATE'))
+                        ORDER BY session.started_at DESC,candidate.score DESC,candidate.candidate_id LIMIT 1)
                   {where}
                  ORDER BY COALESCE(t.english,t.romaji,t.native),tm.anilist_id
             """).fetchall()
@@ -192,11 +210,13 @@ class ModernRepository:
             rows = connection.execute(_TITLE_CTE + """
                 SELECT r.*,t.english,t.romaji,t.native,tm.legacy_payload_json,
                        am.media_format,am.season_name,am.season_year,
+                       ts.tracker_status,ts.server_presence server_status,
                        m.display_name current_mapping,m.target_type mapping_scope,m.season_number mapping_season
                   FROM review_cases r
                   LEFT JOIN titles t ON t.anilist_id=r.anilist_id
                   LEFT JOIN tracked_media tm ON tm.anilist_id=r.anilist_id
-                  LEFT JOIN anilist_media am ON am.anilist_id=r.anilist_id
+                   LEFT JOIN anilist_media am ON am.anilist_id=r.anilist_id
+                   LEFT JOIN tracking_state ts ON ts.tracked_media_id=tm.id
                   LEFT JOIN media_server_mappings m ON m.anilist_id=r.anilist_id AND m.active=1
                  WHERE r.state IN ('OPEN','ACKNOWLEDGED')
                  ORDER BY r.severity DESC,r.created_at
@@ -214,7 +234,10 @@ class ModernRepository:
         for row in rows:
             value=dict(row); value["title"]=resolve_display_title(TitleMetadata(
                 row["anilist_id"],row["english"] or "",row["romaji"] or "",row["native"] or "",self._legacy_title(row["legacy_payload_json"])
-            )); value["candidates"]=tuple(by_review.get(row["review_id"],())); result.append(value)
+            )); value["candidates"]=tuple(by_review.get(row["review_id"],()))
+            try:value["reason"]="; ".join(json.loads(row["evidence_json"] or "[]"))
+            except (TypeError,ValueError):value["reason"]=str(row["evidence_json"] or "")
+            result.append(value)
         return tuple(result)
 
     def history_rows(self) -> tuple[dict, ...]:
@@ -282,25 +305,37 @@ class ModernRepository:
         title=resolve_display_title(TitleMetadata(row["anilist_id"],english,romaji,native,cls._legacy_title(row["legacy_payload_json"])))
         synonyms=tuple(value for value in (row["synonyms"] or "").split(chr(31)) if value) or tuple(cached.get("synonyms") or ())
         mapping_label="No confirmed server mapping"
+        mapping_state="Not mapped"
         if row["target_type"]:
             display=row["display_name"] or row["target_type"].replace("_"," ").title()
             mapping_label=f"{display} [{row['target_type']}]"
             if row["season_number"] is not None:mapping_label+=f" · Season {row['season_number']:02d}"
+            mapping_state="Broken" if row["path_state"]=="MISSING" else "Confirmed"
+        elif row["suggestion_name"]:
+            mapping_label=f"Suggestion available: {row['suggestion_name']} ({row['suggestion_confidence']}, {row['suggestion_score']})"
+            mapping_state="Suggestion available"
         evidence={}
         try:evidence=json.loads(row["evidence_summary_json"] or "{}")
         except (TypeError,ValueError):pass
         if not isinstance(evidence,dict):evidence={"match_evidence":evidence}
-        missing=tuple(int(value) for value in evidence.get("missing_episode_numbers",()) if str(value).isdigit())
+        coverage={}
+        try:coverage=json.loads(row["coverage_json"] or "{}")
+        except (TypeError,ValueError):pass
+        if not isinstance(coverage,dict):coverage={}
+        missing_values=coverage.get("missing_aired_episode_numbers") or coverage.get("missing_expected_episode_numbers") or evidence.get("missing_episode_numbers",())
+        missing=tuple(int(value) for value in missing_values if str(value).isdigit())
+        raw_presence=row["calculated_presence"] or row["server_presence"] or "NOT_FOUND"
+        server_presence={"ON_SERVER":"COMPLETE","NEEDS_REVIEW":"PATH_MISSING"}.get(raw_presence,raw_presence)
         relation_label="\n".join(f"{item.relation_type.replace('_',' ').title()}: {item.title} (AniList {item.target_anilist_id})" for item in relations)
         return AnimeRow(
             row["anilist_id"],title,romaji,native,row["media_format"] or cached.get("format") or "UNKNOWN",
             row["season_name"] or cached.get("season") or "",row["season_year"] or cached.get("seasonYear"),
             row["anilist_status"] or cached.get("status") or "UNKNOWN",row["tracker_status"] or "Unknown",
-            row["server_presence"] or "NOT_FOUND",row["episode_coverage"] or "UNKNOWN",
+            server_presence,row["episode_coverage"] or "UNKNOWN",
             str(next_airing.get("episode") or payload.get("next_airing_episode") or ""),row["review_status"] or "",
             row["source_updated_at"] or "",row["cover_image_url"] or cached_cover.get("extraLarge") or cached_cover.get("large") or cached_cover.get("medium") or "",
             mapping_label,relation_label,bool(row["archived_at"]),english,synonyms,row["episode_count"] or cached.get("episodes"),
             str(next_airing.get("airingAt") or ""),row["page_url"] or cached.get("siteUrl") or "",row["review_reason"] or "",relations,
-            evidence.get("expected_episode_count") or row["episode_count"] or cached.get("episodes"),evidence.get("aired_episode_count"),
-            evidence.get("present_episode_count"),missing,
+            coverage.get("expected_total_episodes") or evidence.get("expected_episode_count") or row["episode_count"] or cached.get("episodes"),coverage.get("aired_episode_count",evidence.get("aired_episode_count")),
+            len(coverage.get("present_episode_numbers",())) if coverage.get("present_episode_numbers") is not None else evidence.get("present_episode_count"),missing,mapping_state,
         )

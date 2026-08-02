@@ -54,7 +54,11 @@ class MatchingRepository:
 
     def save_session(self, session: MatchingSession) -> None:
         with self.connect() as connection:
-            connection.execute(
+            self._save_session(connection,session)
+
+    @staticmethod
+    def _save_session(connection:sqlite3.Connection,session:MatchingSession)->None:
+        connection.execute(
                 """
                 INSERT OR REPLACE INTO matching_sessions(
                     session_id,profile_id,inventory_snapshot_id,anilist_version,started_at,
@@ -72,9 +76,13 @@ class MatchingRepository:
         if not candidates:
             return
         with self.connect() as connection:
-            for candidate in candidates:
-                target = candidate.target
-                connection.execute(
+            self._save_candidates(connection,candidates)
+
+    @staticmethod
+    def _save_candidates(connection:sqlite3.Connection,candidates:tuple[MatchCandidate,...])->None:
+        for candidate in candidates:
+            target = candidate.target
+            connection.execute(
                     """
                     INSERT OR REPLACE INTO server_match_candidates(
                         candidate_id,session_id,profile_id,anilist_id,target_identity_key,target_type,
@@ -96,6 +104,15 @@ class MatchingRepository:
                         candidate.session_id,
                     ),
                 )
+
+    def save_generation_batch(self,values)->None:
+        """Persist prepared sessions, candidates, and reviews in one thread-owned transaction."""
+        with self.connect() as connection:
+            for session,candidates,reviews in values:
+                self._save_session(connection,session)
+                self._save_candidates(connection,candidates)
+                for review in reviews:
+                    self._save_review(connection,review)
 
     def get_session(self, session_id: str) -> MatchingSession | None:
         with self.connect() as connection:
@@ -330,7 +347,11 @@ class MatchingRepository:
 
     def save_review(self, review: MatchingReviewCase) -> None:
         with self.connect() as connection:
-            connection.execute(
+            self._save_review(connection,review)
+
+    @staticmethod
+    def _save_review(connection:sqlite3.Connection,review:MatchingReviewCase)->None:
+        connection.execute(
                 """
                 INSERT INTO review_cases(
                     review_id,profile_id,anilist_id,review_type,state,severity,evidence_json,
@@ -347,8 +368,8 @@ class MatchingRepository:
                     review.resolution, review.user_note,
                 ),
             )
-            connection.execute("DELETE FROM review_case_candidates WHERE review_id=?", (review.review_id,))
-            connection.executemany(
+        connection.execute("DELETE FROM review_case_candidates WHERE review_id=?", (review.review_id,))
+        connection.executemany(
                 "INSERT INTO review_case_candidates(review_id,candidate_id) VALUES(?,?)",
                 ((review.review_id, candidate_id) for candidate_id in review.candidate_ids),
             )
@@ -397,6 +418,145 @@ class MatchingRepository:
             )
             if result.rowcount == 0:
                 raise KeyError(review_id)
+
+    def reconcile_candidate_reviews(
+        self,
+        profile_id:str,
+        anilist_id:int,
+        candidate_ids:tuple[str,...],
+        when:datetime,
+    )->dict[str,int]:
+        candidate_types=(
+            "AMBIGUOUS_STRONG_CANDIDATES","ABSOLUTE_NUMBERING_UNRESOLVED",
+            "UNSTABLE_REJECTED_TARGET","SPECIAL_PARENT_UNRESOLVED",
+        )
+        placeholders=",".join("?" for _ in candidate_types)
+        linked=superseded=0
+        with self.connect() as connection:
+            rows=connection.execute(
+                f"SELECT review_id FROM review_cases WHERE profile_id=? AND anilist_id=? AND state IN ('OPEN','ACKNOWLEDGED') AND review_type IN ({placeholders})",
+                (profile_id,anilist_id,*candidate_types),
+            ).fetchall()
+            for row in rows:
+                review_id=row["review_id"]
+                if candidate_ids:
+                    connection.execute("DELETE FROM review_case_candidates WHERE review_id=?",(review_id,))
+                    connection.executemany("INSERT INTO review_case_candidates(review_id,candidate_id) VALUES(?,?)",((review_id,value) for value in candidate_ids[:8]))
+                    linked+=1
+                else:
+                    connection.execute("UPDATE review_cases SET state='SUPERSEDED',resolution='NO_CURRENT_CANDIDATE',user_note='Complete inventory scan found no current candidate; no match is a normal server state.',updated_at=? WHERE review_id=?",(_iso(when),review_id))
+                    superseded+=1
+        return {"linked":linked,"superseded":superseded}
+
+    def resolve_review_not_on_server(
+        self,
+        review_id: str,
+        profile_id: str,
+        anilist_id: int,
+        override_id: str,
+        reason: str,
+        when: datetime,
+    ) -> dict[str, object]:
+        """Resolve one review and persist an idempotent, candidate-free manual decision."""
+        timestamp = _iso(when)
+        with self.connect() as connection:
+            tracked = connection.execute(
+                """
+                SELECT tm.id,am.anilist_status,am.media_format,ts.tracker_status
+                  FROM tracked_media tm
+                  JOIN anilist_media am ON am.anilist_id=tm.anilist_id
+                  JOIN tracking_state ts ON ts.tracked_media_id=tm.id
+                 WHERE tm.anilist_id=? AND tm.archived_at IS NULL
+                """,
+                (anilist_id,),
+            ).fetchone()
+            if tracked is None:
+                raise ValueError(f"AniList {anilist_id} is not an active tracked title.")
+            review = connection.execute(
+                "SELECT state,anilist_id FROM review_cases WHERE review_id=? AND profile_id=?",
+                (review_id, profile_id),
+            ).fetchone()
+            if review is None or int(review["anilist_id"]) != anilist_id:
+                raise ValueError("The selected review does not belong to this tracked title and profile.")
+
+            existing = connection.execute(
+                """
+                SELECT override_id FROM mapping_overrides
+                 WHERE profile_id=? AND anilist_id=? AND decision_type='NOT_ON_SERVER' AND active=1
+                 ORDER BY created_at DESC LIMIT 1
+                """,
+                (profile_id, anilist_id),
+            ).fetchone()
+            decision_created = existing is None
+            if decision_created:
+                connection.execute(
+                    "UPDATE mapping_overrides SET active=0,cleared_at=? WHERE profile_id=? AND anilist_id=? AND active=1",
+                    (timestamp, profile_id, anilist_id),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO mapping_overrides(
+                        override_id,profile_id,anilist_id,decision_type,active,reason,created_at
+                    ) VALUES(?,?,?,'NOT_ON_SERVER',1,?,?)
+                    """,
+                    (override_id, profile_id, anilist_id, reason, timestamp),
+                )
+
+            if review["state"] in {"OPEN", "ACKNOWLEDGED"}:
+                connection.execute(
+                    """
+                    UPDATE review_cases
+                       SET state='RESOLVED',resolution='MARKED_NOT_ON_SERVER',user_note=?,updated_at=?
+                     WHERE review_id=? AND profile_id=?
+                    """,
+                    (reason, timestamp, review_id, profile_id),
+                )
+
+            remaining = connection.execute(
+                """
+                SELECT review_type,evidence_json FROM review_cases
+                 WHERE profile_id=? AND anilist_id=? AND state IN ('OPEN','ACKNOWLEDGED')
+                 ORDER BY created_at,review_id
+                """,
+                (profile_id, anilist_id),
+            ).fetchall()
+            previous_status = tracked["tracker_status"]
+            if remaining:
+                tracker_status = "Needs Review"
+                server_presence = "NEEDS_REVIEW"
+                review_status = "OPEN"
+                review_reason = "; ".join(str(row["review_type"]).replace("_", " ").title() for row in remaining)
+            else:
+                tracker_status = _anilist_tracker_status(
+                    tracked["anilist_status"], tracked["media_format"], previous_status,
+                )
+                server_presence = "NOT_ON_SERVER"
+                review_status = "NONE"
+                review_reason = ""
+            connection.execute(
+                """
+                UPDATE tracking_state
+                   SET tracker_status=?,server_presence=?,episode_coverage='NONE',
+                       review_status=?,review_reason=?,last_checked=?
+                 WHERE tracked_media_id=?
+                """,
+                (tracker_status, server_presence, review_status, review_reason, timestamp, tracked["id"]),
+            )
+            if decision_created:
+                connection.execute(
+                    """
+                    INSERT INTO status_history(
+                        tracked_media_id,event_type,previous_tracker_status,new_tracker_status,created_at
+                    ) VALUES(?,'MANUALLY_MARKED_NOT_ON_SERVER',?,?,?)
+                    """,
+                    (tracked["id"], previous_status, tracker_status, timestamp),
+                )
+            return {
+                "decision_created": decision_created,
+                "remaining_reviews": len(remaining),
+                "tracker_status": tracker_status,
+                "server_presence": server_presence,
+            }
 
     def save_manual_decision(
         self,
@@ -523,6 +683,18 @@ class MatchingRepository:
 
 def _iso(value: datetime | None) -> str | None:
     return value.isoformat() if value else None
+
+
+def _anilist_tracker_status(anilist_status: str, media_format: str, previous_status: str) -> str:
+    if media_format == "MOVIE" and previous_status in {"Movie Theatrical Only", "Movie Digitally Available"}:
+        return previous_status
+    if anilist_status == "RELEASING":
+        return "Currently Airing"
+    if anilist_status in {"NOT_YET_RELEASED", "HIATUS"}:
+        return "Upcoming"
+    if anilist_status in {"FINISHED", "CANCELLED"}:
+        return "Finished / Ready to Add"
+    return previous_status if previous_status not in {"Needs Review", "On Server"} else "Upcoming"
 
 
 def _datetime(value: str | None) -> datetime | None:

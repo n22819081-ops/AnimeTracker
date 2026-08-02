@@ -50,6 +50,24 @@ class MatchingService:
         franchise_identity: str = "",
         archived: bool = False,
     ) -> CandidateGenerationResult:
+        result,reviews=self.prepare_candidates(
+            media,inventory,relations=relations,profile_id=profile_id,session_id=session_id,
+            franchise_identity=franchise_identity,archived=archived,
+        )
+        self.repository.save_generation_batch(((result.session,result.candidates,reviews),))
+        return result
+
+    def prepare_candidates(
+        self,
+        media: AniListMedia,
+        inventory: ServerInventorySnapshot,
+        *,
+        relations: Iterable[AniListRelation] = (),
+        profile_id: str = "default",
+        session_id: str | None = None,
+        franchise_identity: str = "",
+        archived: bool = False,
+    ) -> tuple[CandidateGenerationResult,tuple[MatchingReviewCase,...]]:
         now = self._clock()
         snapshot_key = inventory_snapshot_id(inventory)
         version = media_version(media)
@@ -60,13 +78,11 @@ class MatchingService:
         )
         if archived:
             result = CandidateGenerationResult(session, (), (), ("Archived entries are excluded from matching.",), False)
-            self.repository.save_session(session)
-            return result
+            return result,()
         suppression = self.repository.get_suppression(profile_id, media.anilist_id)
         if suppression and suppression.active:
             result = CandidateGenerationResult(session, (), (), ("Automatic matching is suppressed by an explicit user decision.",), True)
-            self.repository.save_session(session)
-            return result
+            return result,()
 
         rejections = self.repository.list_rejections(profile_id, media.anilist_id, now)
         mappings = self.repository.list_all_active_mappings(profile_id)
@@ -88,19 +104,17 @@ class MatchingService:
             candidate_count=len(result.candidates),
             warning_count=len(result.warnings) + sum(len(item.evidence.warnings) for item in result.candidates),
         ))
-        self.repository.save_session(result.session)
-        self.repository.save_candidates(result.candidates)
-
+        review_input = result
+        if manual_decision in {ManualDecisionType.NOT_ON_SERVER, ManualDecisionType.NO_VALID_CANDIDATE}:
+            review_input = replace(result, candidates=())
         reviews = generate_matching_reviews(
             profile_id=profile_id,
             media=media,
-            generated=result,
+            generated=review_input,
             mappings=mappings,
             now=now,
         )
-        for review in reviews:
-            self.repository.save_review(review)
-        return result
+        return result,reviews
 
     def get_candidate_details(self, candidate_id: str) -> MatchCandidate:
         candidate = self.repository.get_candidate(candidate_id)
@@ -200,6 +214,18 @@ class MatchingService:
         self.repository.save_manual_decision(
             f"override-{uuid.uuid4().hex}", profile_id, anilist_id,
             ManualDecisionType.NOT_ON_SERVER, reason, self._clock(), clear_mappings=True,
+        )
+
+    def resolve_review_not_on_server(
+        self,
+        review_id: str,
+        anilist_id: int,
+        *,
+        profile_id: str = "default",
+        reason: str = "Manually confirmed not on the Jellyfin server.",
+    ) -> dict[str, object]:
+        return self.repository.resolve_review_not_on_server(
+            review_id, profile_id, anilist_id, f"override-{uuid.uuid4().hex}", reason, self._clock(),
         )
 
     def mark_no_valid_candidate(self, anilist_id: int, *, profile_id: str = "default", reason: str = "") -> None:

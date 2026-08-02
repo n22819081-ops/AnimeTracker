@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from collections import OrderedDict
 
@@ -21,6 +22,9 @@ from .profile import ModernProfile
 from .theme import apply_theme
 from .workers import BackgroundWorker, WorkerProgress
 from ..runtime import APP_VERSION
+
+
+LOGGER=logging.getLogger(__name__)
 
 
 PAGE_LABELS = (
@@ -53,7 +57,7 @@ class MainWindow(QMainWindow):
         toolbar=QFrame(); toolbar.setObjectName("toolbar"); tools=QHBoxLayout(toolbar); tools.setContentsMargins(14,9,14,9)
         self.search=QLineEdit(); self.search.setPlaceholderText("Search titles, status, format, year, or mapping"); self.search.setClearButtonEnabled(True); self.search.textChanged.connect(self._search_current); tools.addWidget(self.search,1)
         self.refresh=QToolButton(); self.refresh.setText("Refresh"); self.refresh.setIcon(self.style().standardIcon(QStyle.SP_BrowserReload)); self.refresh.clicked.connect(self.start_refresh); self.refresh.setToolTip("Refresh visible cached data in a background worker")
-        self.scan=QToolButton(); self.scan.setText("Scan Jellyfin"); self.scan.setIcon(self.style().standardIcon(QStyle.SP_DirOpenIcon)); self.scan.clicked.connect(self.start_scan); self.scan.setToolTip("Scan explicitly configured test roots read-only")
+        self.scan=QToolButton(); self.scan.setText("Scan Jellyfin Libraries — Read Only" if self.production else "Scan Test Jellyfin Roots — Read Only"); self.scan.setIcon(self.style().standardIcon(QStyle.SP_DirOpenIcon)); self.scan.clicked.connect(self.start_scan); self.scan.setToolTip("Scan the configured production Jellyfin roots without modifying media" if self.production else "Scan explicitly configured test roots read-only")
         self.add=QPushButton("Add Anime"); self.add.setObjectName("primary"); self.add.clicked.connect(self.open_add); tools.addWidget(self.refresh); tools.addWidget(self.scan); tools.addWidget(self.add); content_layout.addWidget(toolbar)
         self.stack=QStackedWidget(); content_layout.addWidget(self.stack,1)
         status=QFrame(); status.setObjectName("toolbar"); status_layout=QHBoxLayout(status); status_layout.setContentsMargins(14,6,14,6)
@@ -74,7 +78,7 @@ class MainWindow(QMainWindow):
                 "All":lambda r:True,"Partial":lambda r:r.server_status=="PARTIAL","Not found":lambda r:r.server_status in {"NOT_ON_SERVER","NOT_FOUND"},"Unknown coverage":lambda r:r.coverage=="UNKNOWN","Needs mapping":lambda r:r.mapping_label=="No confirmed server mapping",
             }),
             "Movies":MoviesPage(self.repository),
-            "On Server":AnimeListPage("On Server",self.repository,lambda r:r.server_status=="COMPLETE","AniList status remains visible independently from complete server coverage.",{
+            "On Server":AnimeListPage("On Server",self.repository,lambda r:r.server_status=="COMPLETE" or r.tracker_status=="On Server","AniList status remains visible independently from complete server coverage.",{
                 "All":lambda r:True,"Currently airing":lambda r:r.anilist_status=="RELEASING","Finished":lambda r:r.anilist_status=="FINISHED","Movie":lambda r:r.media_format=="MOVIE","Series":lambda r:r.media_format=="TV","Unknown coverage warning":lambda r:r.coverage=="UNKNOWN",
             }),
             "Needs Review":ReviewPage(self.repository),
@@ -116,12 +120,14 @@ class MainWindow(QMainWindow):
 
     def start_refresh(self):
         if self.production:
+            self._assert_active_profile()
             if QMessageBox.question(self,"Refresh AniList","Refresh all active titles from AniList? Cached data is preserved on partial failure and no baseline notifications are generated.")!=QMessageBox.Yes:return
             self._start_worker("AniList refresh all active",_production_refresh,self.profile)
         else:self._start_worker("Cache refresh",_simulated_operation,42)
 
     def start_scan(self):
         if self.production:
+            self._assert_active_profile()
             message="Scan these roots read-only?\n\n"+"\n".join(_production_root_lines(self.profile))+"\n\nNo media files or folders will be modified."
             if QMessageBox.question(self,"Confirm read-only Jellyfin scan",message)!=QMessageBox.Yes:return
             self._start_worker("Read-only production inventory scan",_production_scan,self.profile);return
@@ -144,17 +150,51 @@ class MainWindow(QMainWindow):
             self.task_status.setText(f"{label}: {result.status}")
         if isinstance(result,dict) and result.get("failed"):
             self.task_status.setText(f"{label}: {result.get('succeeded',0)} succeeded, {result['failed']} failed")
-        if "refresh" in label.casefold():self.last_refresh.setText("Last refresh: just now")
-        else:self.last_scan.setText("Last scan: just now")
-        for page in self.pages.values():
-            if hasattr(page,"refresh"):page.refresh()
-    def _task_error(self,kind,detail):self.progress.hide(); self.task_status.setText(f"Task failed: {kind}"); QMessageBox.warning(self,"Background task failed",f"The operation could not finish.\n\n{detail}")
+        summary=_operation_summary(label,result)
+        if "refresh" in label.casefold():self.last_refresh.setText(f"Last refresh: {result.get('completed_at','just now') if isinstance(result,dict) else 'just now'}")
+        else:self.last_scan.setText(f"Last scan: {result.get('completed_at','just now') if isinstance(result,dict) else 'just now'}")
+        self._refresh_pages();self.last_operation_summary=summary
+        if self.production and summary:QMessageBox.information(self,f"{label} complete",summary)
+    def _task_error(self,kind,detail):LOGGER.error("Background operation failed (%s): %s",kind,detail);self.progress.hide(); self.task_status.setText(f"Task failed: {kind}"); QMessageBox.warning(self,"Background task failed",f"The operation could not finish.\n\n{detail}")
 
     def open_add(self):
         provider=_production_search_provider(self.profile) if self.production else None
         AddAnimeDialog(search_provider=provider,parent=self,background_search=self.production).exec()
     def open_detail(self,row):AnimeDetailDialog(row,self,details=self.repository.media_details(row.anilist_id)).exec()
-    def open_review(self,review):MatchingReviewDialog(review,self).exec()
+    def open_review(self,review):
+        dialog=MatchingReviewDialog(review,self);dialog.mark_not_on_server_requested.connect(lambda value:self._mark_review_not_on_server(value,dialog));dialog.suppress_auto_match_requested.connect(lambda value:self._suppress_review_matching(value,dialog));dialog.exec()
+
+    def _mark_review_not_on_server(self,review,dialog):
+        try:
+            self._assert_active_profile()
+            from ..services.matching.repository import MatchingRepository
+            from ..services.matching.service import MatchingService
+            MatchingService(MatchingRepository(self.profile.database_path)).resolve_review_not_on_server(
+                str(review["review_id"]),int(review["anilist_id"]),profile_id=str(review.get("profile_id") or "default"),
+            )
+        except Exception as exc:
+            LOGGER.exception("Mark Not on Server failed for AniList %s",review.get("anilist_id"));dialog.show_action_error(f"Mark Not on Server failed: {exc}");QMessageBox.warning(dialog,"Decision not saved",f"The decision could not be saved.\n\n{exc}");return
+        self._refresh_pages();dialog.accept()
+
+    def _suppress_review_matching(self,review,dialog):
+        try:
+            self._assert_active_profile()
+            from ..services.matching.repository import MatchingRepository
+            from ..services.matching.service import MatchingService
+            MatchingService(MatchingRepository(self.profile.database_path)).suppress_auto_match(
+                int(review["anilist_id"]),profile_id=str(review.get("profile_id") or "default"),reason="Suppressed from matching review.",
+            )
+        except Exception as exc:
+            LOGGER.exception("Automatic matching suppression failed for AniList %s",review.get("anilist_id"));dialog.show_action_error(f"Suppression failed: {exc}");QMessageBox.warning(dialog,"Suppression not saved",f"Automatic matching could not be suppressed.\n\n{exc}");return
+        self._refresh_pages();dialog.accept()
+
+    def _assert_active_profile(self):
+        if self.repository.database_path.resolve()!=self.profile.database_path.resolve():
+            raise RuntimeError("Active profile mismatch: the GUI repository and operation profile differ.")
+
+    def _refresh_pages(self):
+        for page in self.pages.values():
+            if hasattr(page,"refresh"):page.refresh()
     def open_preview(self):LegacyImportPreviewDialog(self.repository,self).exec()
     def run_scheduled_now(self):self._start_worker("Production scheduled check",_production_scheduled_check,self.profile)
     def install_validation_task(self):
@@ -208,12 +248,22 @@ class _EventToken:
 def _production_refresh(profile,*,cancel_event,progress):
     from ..production.operations import ProductionAniListOperations
     operation=ProductionAniListOperations(profile);preview=operation.preview();progress(0,preview["count"],f"Preparing {preview['count']} active AniList identities")
-    result=operation.refresh(token=_EventToken(cancel_event),baseline=False);progress(result["succeeded"]+result["failed"],preview["count"],f"{result['succeeded']} refreshed, {result['failed']} failed");return result
+    result=operation.refresh(token=_EventToken(cancel_event),baseline=False);result["completed_at"]=__import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat();progress(result["succeeded"]+result["failed"],preview["count"],f"{result['succeeded']} refreshed, {result['failed']} failed");return result
 
 
 def _production_scan(profile,*,cancel_event,progress):
     from ..production.operations import ProductionInventoryOperations
     progress(0,2,"Scanning TV Library read-only");result=ProductionInventoryOperations(profile).scan(confirmed=True,token=_EventToken(cancel_event));progress(2,2,f"Inventory {result['status'].casefold()}");return result
+
+
+def _operation_summary(label,result)->str:
+    if not isinstance(result,dict):return ""
+    if "refresh" in label.casefold():
+        return "\n".join(("AniList refresh complete",f"{result.get('checked',result.get('requested',0))} titles checked",f"{result.get('succeeded',0)} succeeded",f"{result.get('failed',0)} failed",f"{result.get('cache_hits',0)} cache hits",f"{result.get('network_requests',0)} network requests",f"{result.get('metadata_changes',0)} metadata changes"))
+    if "inventory scan" in label.casefold():
+        stats=result.get("statistics",{})
+        return "\n".join(("Jellyfin scan complete",f"{result.get('item_count',0)} library items",f"{stats.get('files_seen',0)} files",f"{stats.get('media_files_seen',0)} media files",f"{result.get('candidate_suggestions',0)} candidate suggestions",f"{result.get('mappings_revalidated',0)} mappings revalidated","0 mappings auto-confirmed",f"{result.get('review_cases',0)} review cases"))
+    return ""
 
 
 def _production_scheduled_check(profile,*,cancel_event,progress):

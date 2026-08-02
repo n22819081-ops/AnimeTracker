@@ -111,15 +111,16 @@ class FranchisePage(Page):
 class CoveragePage(Page):
     def __init__(self,repo):
         super().__init__("Jellyfin Coverage","Read-only coverage views. No rename, move, delete, repair, or library-scan actions are available."); self.repo=repo
-        self.tabs=QTabWidget(); self.by_anime=QTreeWidget();self.by_anime.setHeaderLabels(["Anime","Season scope","Expected","Aired","Present","Missing","Coverage","Mapping target"]); self.tabs.addTab(self.by_anime,"By anime")
+        self.tabs=QTabWidget(); self.by_anime=QTreeWidget();self.by_anime.setHeaderLabels(["Anime","Season scope","Expected","Aired","Present","Missing","Coverage","Mapping","Mapping target"]); self.tabs.addTab(self.by_anime,"By anime")
         self.by_folder=QTreeWidget(); self.by_folder.setHeaderLabels(["Folder display name","Seasons discovered","Mapped anime titles","Mapping scopes","Unmapped inventory","Ambiguous files"]); self.tabs.addTab(self.by_folder,"By server folder")
         self.missing=QTreeWidget();self.missing.setHeaderLabels(["Anime","Missing episodes","Mapping target"]);self.tabs.addTab(self.missing,"Missing episodes"); self.layout.addWidget(self.tabs,1); self.refresh()
     def refresh(self):
         rows=self.repo.tracked_media(); self.by_anime.clear();self.missing.clear();self.by_folder.clear()
         for row in rows:
             scope=(f"Season {row.mapping_label.rsplit('Season ',1)[-1]}" if "Season " in row.mapping_label else ("Movie" if row.media_format=="MOVIE" else "Unspecified"))
-            self.by_anime.addTopLevelItem(QTreeWidgetItem([row.title,scope,str(row.expected_episodes or "Unknown"),str(row.aired_episodes if row.aired_episodes is not None else "Unknown"),str(row.present_episodes if row.present_episodes is not None else "Unknown"),", ".join(map(str,row.missing_episodes)) or "None known",row.coverage,row.mapping_label]))
-            if row.mapping_label!="No confirmed server mapping":self.by_folder.addTopLevelItem(QTreeWidgetItem([row.mapping_label,scope,row.title,row.mapping_label,"None recorded","None recorded" if not row.review_reason else row.review_reason]))
+            coverage="Not evaluated" if row.mapping_state in {"Not mapped","Suggestion available"} else ("Unknown" if row.coverage=="UNKNOWN" else row.coverage.replace("_"," ").title())
+            self.by_anime.addTopLevelItem(QTreeWidgetItem([row.title,scope,str(row.expected_episodes or "Unknown"),str(row.aired_episodes if row.aired_episodes is not None else "Unknown"),str(row.present_episodes if row.present_episodes is not None else "Unknown"),", ".join(map(str,row.missing_episodes)) or "None known",coverage,row.mapping_state,row.mapping_label]))
+            if row.mapping_state in {"Confirmed","Broken"}:self.by_folder.addTopLevelItem(QTreeWidgetItem([row.mapping_label,scope,row.title,row.mapping_label,"None recorded","None recorded" if not row.review_reason else row.review_reason]))
             if row.server_status=="PARTIAL":self.missing.addTopLevelItem(QTreeWidgetItem([row.title,", ".join(map(str,row.missing_episodes)) or "Episode evidence unavailable",row.mapping_label]))
     def set_search(self,text):
         query=text.casefold().strip()

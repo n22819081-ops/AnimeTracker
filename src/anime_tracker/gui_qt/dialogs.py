@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QThreadPool
+from PySide6.QtCore import Qt, QThreadPool, Signal
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGridLayout, QGroupBox, QHBoxLayout,
     QLabel, QLineEdit, QListWidget, QMessageBox, QPushButton, QSpinBox, QTabWidget,
@@ -105,9 +105,12 @@ class AnimeDetailDialog(QDialog):
 
 
 class MatchingReviewDialog(QDialog):
+    mark_not_on_server_requested = Signal(dict)
+    suppress_auto_match_requested = Signal(dict)
+
     def __init__(self,review:dict,parent=None):
         super().__init__(parent); self.review=review; self.setWindowTitle("Review Server Match"); self.resize(780,600)
-        layout=QVBoxLayout(self); layout.addWidget(QLabel(f"{review.get('title') or 'Tracked anime'}\nAniList {review.get('anilist_id','')} · {review.get('media_format','Unknown')} · {review.get('season_name') or ''} {review.get('season_year') or ''}"))
+        layout=QVBoxLayout(self); layout.addWidget(QLabel(f"{review.get('title') or 'Tracked anime'}\nAniList {review.get('anilist_id','')} · {review.get('media_format','Unknown')} · {review.get('season_name') or ''} {review.get('season_year') or ''}\nTracker: {review.get('tracker_status') or 'Unknown'} · Server: {review.get('server_status') or 'Unknown'}"))
         explanation=QLabel(f"Why this item needs review: {review.get('reason') or review.get('review_type','Decision required').replace('_',' ').title()}"); explanation.setWordWrap(True); layout.addWidget(explanation)
         mapping=QLabel(f"Current mapping: {review.get('current_mapping') or 'No confirmed server mapping'}");mapping.setWordWrap(True);layout.addWidget(mapping)
         self.candidates=QTableWidget(0,5); self.candidates.setHorizontalHeaderLabels(["Suggested target","Confidence","Score","Evidence","Exact Jellyfin path"]); layout.addWidget(self.candidates,1)
@@ -115,8 +118,20 @@ class MatchingReviewDialog(QDialog):
             pos=self.candidates.rowCount(); self.candidates.insertRow(pos)
             values=(candidate.get("display_name") or candidate.get("target") or candidate.get("relative_path") or "Unnamed target",candidate.get("confidence") or "",candidate.get("score") or "",candidate.get("evidence_json") or candidate.get("evidence") or "",candidate.get("relative_path") or "")
             for col,value in enumerate(values):self.candidates.setItem(pos,col,QTableWidgetItem(str(value)))
-        self.stale=bool(review.get("stale")); self.notice=QLabel("Candidate is stale and must be regenerated." if self.stale else "Manual confirmation is required. Suggestions are never auto-confirmed."); self.notice.setObjectName("profileBanner" if self.stale else "muted"); layout.addWidget(self.notice)
-        buttons=QDialogButtonBox(); self.confirm=buttons.addButton("Confirm Suggestion",QDialogButtonBox.AcceptRole); self.confirm.setEnabled(not self.stale and self.candidates.rowCount()>0); buttons.addButton("Choose Different Target",QDialogButtonBox.ActionRole); buttons.addButton("Reject Candidate",QDialogButtonBox.DestructiveRole); buttons.addButton("Mark Not on Server",QDialogButtonBox.ActionRole); buttons.addButton("Suppress Auto-Match",QDialogButtonBox.ActionRole); buttons.addButton(QDialogButtonBox.Cancel); buttons.accepted.connect(self.accept); buttons.rejected.connect(self.reject); layout.addWidget(buttons)
+        has_candidates=self.candidates.rowCount()>0
+        if not has_candidates:
+            self.candidates.hide(); self.empty_candidate_message=QLabel("No Jellyfin candidate was found for this title.\n\nThis title may not be on the server, or the folder name may be too different for automatic matching."); self.empty_candidate_message.setWordWrap(True); self.empty_candidate_message.setObjectName("panel"); layout.addWidget(self.empty_candidate_message,1)
+        else:self.empty_candidate_message=None
+        self.stale=bool(review.get("stale")); self.notice=QLabel("Candidate is stale and must be regenerated." if self.stale else ("Choose an explicit action. No mapping is confirmed automatically." if has_candidates else "No candidate is required to mark this title as not on the server.")); self.notice.setObjectName("profileBanner" if self.stale else "muted"); layout.addWidget(self.notice)
+        buttons=QDialogButtonBox(); self.confirm=None; self.reject_candidate=None
+        if has_candidates:
+            self.confirm=buttons.addButton("Confirm Suggestion",QDialogButtonBox.AcceptRole); self.confirm.setEnabled(not self.stale); self.reject_candidate=buttons.addButton("Reject Candidate",QDialogButtonBox.DestructiveRole)
+        self.choose_folder=buttons.addButton("Choose Folder Manually",QDialogButtonBox.ActionRole); self.choose_folder.setEnabled(False); self.choose_folder.setToolTip("Manual folder selection is not available in this packaged build.")
+        self.mark_not_on_server=buttons.addButton("Mark Not on Server",QDialogButtonBox.ActionRole); self.suppress_auto_match=buttons.addButton("Suppress Automatic Matching",QDialogButtonBox.ActionRole); buttons.addButton(QDialogButtonBox.Cancel)
+        self.mark_not_on_server.clicked.connect(lambda:self.mark_not_on_server_requested.emit(self.review)); self.suppress_auto_match.clicked.connect(lambda:self.suppress_auto_match_requested.emit(self.review)); buttons.accepted.connect(self.accept); buttons.rejected.connect(self.reject); layout.addWidget(buttons)
+
+    def show_action_error(self,message:str)->None:
+        self.notice.setText(message);self.notice.setObjectName("profileBanner");self.notice.style().unpolish(self.notice);self.notice.style().polish(self.notice)
 
 
 class LegacyImportPreviewDialog(QDialog):
