@@ -1,0 +1,15 @@
+{
+  "discord_webhook_url": "",
+  "discord_enabled": false,
+  "windows_enabled": true,
+  "notify_airing_starts": true,
+  "notify_airing_finishes": true,
+  "notify_found_on_server": true,
+  "notify_errors": true,
+  "notify_release_date_changes": true,
+  "shared_discord_webhook_url": "",
+  "shared_announcements_enabled": false,
+  "shared_send_silently": false,
+  "shared_announce_additions": true,
+  "shared_announce_removals": false
+}

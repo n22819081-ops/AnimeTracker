@@ -1,0 +1,754 @@
+{
+  "report_format_version": 1,
+  "source": {
+    "kind": "read-only backup copy",
+    "filename": "anime_tracker.db"
+  },
+  "schema_version": {
+    "explicit": false,
+    "value": null,
+    "note": "Legacy schema has no schema-version table."
+  },
+  "tables": {
+    "anime": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "default": null,
+          "primary_key_position": 1
+        },
+        {
+          "name": "english_title",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "romaji_title",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "native_title",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "alternate_titles",
+          "type": "TEXT",
+          "not_null": true,
+          "default": "'[]'",
+          "primary_key_position": 0
+        },
+        {
+          "name": "anilist_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "format",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "season",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "year",
+          "type": "INTEGER",
+          "not_null": false,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "total_episodes",
+          "type": "INTEGER",
+          "not_null": false,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "airing_status",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "start_date",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "expected_end_date",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "cover_image_url",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "anilist_url",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "tracker_status",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "server_status",
+          "type": "TEXT",
+          "not_null": true,
+          "default": "'Not Found'",
+          "primary_key_position": 0
+        },
+        {
+          "name": "detected_server_path",
+          "type": "TEXT",
+          "not_null": true,
+          "default": "''",
+          "primary_key_position": 0
+        },
+        {
+          "name": "date_added",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "last_checked",
+          "type": "TEXT",
+          "not_null": true,
+          "default": "''",
+          "primary_key_position": 0
+        },
+        {
+          "name": "previous_status",
+          "type": "TEXT",
+          "not_null": true,
+          "default": "''",
+          "primary_key_position": 0
+        },
+        {
+          "name": "notification_state",
+          "type": "TEXT",
+          "not_null": true,
+          "default": "''",
+          "primary_key_position": 0
+        },
+        {
+          "name": "manual_notes",
+          "type": "TEXT",
+          "not_null": true,
+          "default": "''",
+          "primary_key_position": 0
+        },
+        {
+          "name": "movie_availability",
+          "type": "TEXT",
+          "not_null": true,
+          "default": "'unknown'",
+          "primary_key_position": 0
+        },
+        {
+          "name": "api_failure_count",
+          "type": "INTEGER",
+          "not_null": true,
+          "default": "0",
+          "primary_key_position": 0
+        },
+        {
+          "name": "relation_label",
+          "type": "TEXT",
+          "not_null": true,
+          "default": "''",
+          "primary_key_position": 0
+        },
+        {
+          "name": "review_reason",
+          "type": "TEXT",
+          "not_null": true,
+          "default": "''",
+          "primary_key_position": 0
+        }
+      ],
+      "foreign_keys": []
+    },
+    "jellyfin_announcement_snapshot": {
+      "columns": [
+        {
+          "name": "item_type",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "normalized_path",
+          "type": "TEXT",
+          "not_null": false,
+          "default": null,
+          "primary_key_position": 1
+        },
+        {
+          "name": "parent_normalized_path",
+          "type": "TEXT",
+          "not_null": true,
+          "default": "''",
+          "primary_key_position": 0
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "year",
+          "type": "INTEGER",
+          "not_null": false,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "season_number",
+          "type": "INTEGER",
+          "not_null": false,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "original_path",
+          "type": "TEXT",
+          "not_null": true,
+          "default": "''",
+          "primary_key_position": 0
+        },
+        {
+          "name": "captured_at",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        }
+      ],
+      "foreign_keys": []
+    },
+    "manual_announcement_queue": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "default": null,
+          "primary_key_position": 1
+        },
+        {
+          "name": "media_type",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "normalized_title",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "year",
+          "type": "INTEGER",
+          "not_null": false,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "season_number",
+          "type": "INTEGER",
+          "not_null": false,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "episodes_json",
+          "type": "TEXT",
+          "not_null": true,
+          "default": "'[]'",
+          "primary_key_position": 0
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        }
+      ],
+      "foreign_keys": []
+    },
+    "manual_announcement_titles": {
+      "columns": [
+        {
+          "name": "media_type",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 1
+        },
+        {
+          "name": "normalized_title",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 2
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "year",
+          "type": "INTEGER",
+          "not_null": false,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "last_used_at",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        }
+      ],
+      "foreign_keys": []
+    },
+    "match_candidates": {
+      "columns": [
+        {
+          "name": "anilist_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 1
+        },
+        {
+          "name": "path",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 2
+        },
+        {
+          "name": "confidence",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "score",
+          "type": "INTEGER",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "reasons",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "year",
+          "type": "INTEGER",
+          "not_null": false,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "media_kind",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "scanned_at",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        }
+      ],
+      "foreign_keys": []
+    },
+    "notification_events": {
+      "columns": [
+        {
+          "name": "event_key",
+          "type": "TEXT",
+          "not_null": false,
+          "default": null,
+          "primary_key_position": 1
+        },
+        {
+          "name": "event_type",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "anilist_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "sent_at",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        }
+      ],
+      "foreign_keys": []
+    },
+    "rejected_matches": {
+      "columns": [
+        {
+          "name": "anilist_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 1
+        },
+        {
+          "name": "path",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 2
+        },
+        {
+          "name": "rejected_at",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "normalized_path",
+          "type": "TEXT",
+          "not_null": true,
+          "default": "''",
+          "primary_key_position": 0
+        },
+        {
+          "name": "original_path",
+          "type": "TEXT",
+          "not_null": true,
+          "default": "''",
+          "primary_key_position": 0
+        }
+      ],
+      "foreign_keys": []
+    },
+    "server_matches": {
+      "columns": [
+        {
+          "name": "anilist_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "default": null,
+          "primary_key_position": 1
+        },
+        {
+          "name": "path",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "season_label",
+          "type": "TEXT",
+          "not_null": true,
+          "default": "''",
+          "primary_key_position": 0
+        },
+        {
+          "name": "confirmed_at",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "confirmation_type",
+          "type": "TEXT",
+          "not_null": true,
+          "default": "'legacy'",
+          "primary_key_position": 0
+        }
+      ],
+      "foreign_keys": []
+    },
+    "settings": {
+      "columns": [
+        {
+          "name": "key",
+          "type": "TEXT",
+          "not_null": false,
+          "default": null,
+          "primary_key_position": 1
+        },
+        {
+          "name": "value",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        }
+      ],
+      "foreign_keys": []
+    },
+    "status_history": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "default": null,
+          "primary_key_position": 1
+        },
+        {
+          "name": "anilist_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "event",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        },
+        {
+          "name": "previous_status",
+          "type": "TEXT",
+          "not_null": true,
+          "default": "''",
+          "primary_key_position": 0
+        },
+        {
+          "name": "new_status",
+          "type": "TEXT",
+          "not_null": true,
+          "default": "''",
+          "primary_key_position": 0
+        },
+        {
+          "name": "server_path",
+          "type": "TEXT",
+          "not_null": true,
+          "default": "''",
+          "primary_key_position": 0
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "not_null": true,
+          "default": null,
+          "primary_key_position": 0
+        }
+      ],
+      "foreign_keys": []
+    }
+  },
+  "indexes": [
+    {
+      "name": "idx_manual_announcement_duplicate",
+      "table": "manual_announcement_queue",
+      "sql": "CREATE INDEX idx_manual_announcement_duplicate\n                    ON manual_announcement_queue(media_type, normalized_title, year, season_number)"
+    },
+    {
+      "name": "idx_rejected_matches_normalized",
+      "table": "rejected_matches",
+      "sql": "CREATE INDEX idx_rejected_matches_normalized ON rejected_matches(anilist_id, normalized_path)"
+    }
+  ],
+  "foreign_key_count": 0,
+  "row_counts": {
+    "anime": 69,
+    "jellyfin_announcement_snapshot": 1312,
+    "manual_announcement_queue": 0,
+    "manual_announcement_titles": 3,
+    "match_candidates": 114,
+    "notification_events": 0,
+    "rejected_matches": 19,
+    "server_matches": 93,
+    "settings": 16,
+    "status_history": 374
+  },
+  "identity": {
+    "active_tracked_records": 69,
+    "archived_records": 0,
+    "removed_records_inferred_from_orphan_ids": 97,
+    "duplicate_anilist_ids": [],
+    "malformed_anilist_id_count": 0
+  },
+  "server_mappings": {
+    "rows": 93,
+    "anilist_ids_with_mappings": 93,
+    "maximum_mappings_per_anilist_id": 1,
+    "mappings_per_anilist_id_histogram": {
+      "1": 93
+    },
+    "paths_shared_by_multiple_anilist_ids": [
+      {
+        "path_fingerprint": "2afe4de3b071",
+        "anilist_count": 2
+      }
+    ]
+  },
+  "rejected_mapping_rows": 19,
+  "match_candidate_rows": 114,
+  "history_rows": 374,
+  "notification_deduplication_rows": 0,
+  "announcement_baseline_rows": 1312,
+  "manual_announcement_rows": 0,
+  "manual_announcement_title_rows": 3,
+  "orphan_counts": {
+    "server_matches": 92,
+    "rejected_matches": 8,
+    "match_candidates": 100,
+    "status_history": 221,
+    "notification_events": 0
+  },
+  "stored_path_validation": {
+    "filesystem_existence_checked": false,
+    "reason": "Milestone 1 must not scan Jellyfin media.",
+    "syntactically_empty_paths": {
+      "server_matches": 0,
+      "rejected_matches": 0,
+      "match_candidates": 0
+    },
+    "syntactically_invalid_windows_paths": {
+      "server_matches": 0,
+      "rejected_matches": 0,
+      "match_candidates": 0
+    }
+  },
+  "status_distributions": {
+    "anilist_status": {
+      "RELEASING": 29,
+      "FINISHED": 24,
+      "NOT_YET_RELEASED": 16
+    },
+    "tracker_status": {
+      "Currently Airing": 29,
+      "Finished / Ready to Add": 17,
+      "Upcoming": 15,
+      "Needs Review": 4,
+      "Movie Theatrical Only": 3,
+      "On Server": 1
+    },
+    "server_status": {
+      "Not Found": 64,
+      "Needs Review": 4,
+      "On Server": 1
+    },
+    "format": {
+      "TV": 52,
+      "ONA": 5,
+      "TV_SHORT": 4,
+      "OVA": 4,
+      "MOVIE": 3,
+      "SPECIAL": 1
+    },
+    "movie_availability": {
+      "unknown": 69
+    }
+  },
+  "inconsistent_status_combinations": {
+    "tracker_on_server_but_server_not_on_server": 0,
+    "server_on_server_but_tracker_not_on_server": 0,
+    "on_server_without_server_mapping": 0,
+    "active_mapping_but_tracker_not_on_server": 0,
+    "needs_review_without_review_server_status": 0
+  },
+  "settings": {
+    "announcement_baseline_created": "true",
+    "movie_path": "<configured-path:6657941c7392>",
+    "schedule_day": "Sunday",
+    "schedule_discord_summary_changes_only": "true",
+    "schedule_enabled": "true",
+    "schedule_frequency": "Weekly",
+    "schedule_start_when_available": "true",
+    "schedule_time": "10:00",
+    "scheduled_last_check": "2026-07-26T10:02:04",
+    "scheduled_last_result": "Success",
+    "scheduled_moved_on_server": "0",
+    "scheduled_moved_ready": "2",
+    "scheduled_next_check": "2026-08-02T10:00",
+    "scheduled_titles_updated": "42",
+    "theme": "Dark",
+    "tv_path": "<configured-path:4a999d222eab>"
+  }
+}

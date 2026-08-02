@@ -2,6 +2,14 @@
 
 Anime Tracker is a local Windows desktop app for tracking anime you want to add to a Jellyfin server. It uses AniList public GraphQL queries for metadata and stores local tracking state in SQLite.
 
+## Modernization Status
+
+Modernization Milestone 1 establishes verified backups, local Git history, legacy data inventory, normalized schema version 1, a copy-only migration prototype, reconciliation, secret-storage planning, and media-safety requirements. It does not replace the Tkinter application or live database.
+
+Milestone documentation is under `docs/`. The disposable prototype is created under ignored `migration_test/`, and the immutable checkpoint is under ignored `modernization_backups/`.
+
+The separate `jellyfin storage checker` is a different product. It is excluded from Git and modernization and must not be invoked or modified by Anime Tracker.
+
 The app scans Jellyfin folders read-only. It never renames, moves, modifies, replaces, or deletes anything in your media folders.
 
 ## Install
