@@ -171,3 +171,12 @@ Schema v4 conservatively adapts only the active prototype matching records on a 
 | Manual `On Server` state | Remains in migrated tracking payload and is not recalculated from v4 coverage. |
 
 The adapter preserves one known shared-folder representation because `media_server_mappings` has no uniqueness constraint on inventory item or normalized path. Future manual decisions can refine an unknown legacy folder into precise season targets while superseding, never overwriting, its history.
+
+## Milestone 6 Notification Adapter
+
+- All 1,312 `announcement_baselines` rows become active `shared_announcement_baselines_v2` rows; original path fields remain only in the renamed v1 audit table.
+- Legacy delivered notification evidence remains delivered. Any non-delivered legacy outbox evidence becomes failed, never delivered.
+- Manual queue rows become drafts and cannot bypass privacy, credential, payload, outbox, or delivery-history rules.
+- Manual title suggestions remain in the renamed audit table.
+- Legacy plaintext notification configuration is not read automatically. An explicitly supplied adapter input records enabled intent, redacted secret presence, and `LEGACY_IMPORT_PENDING` credential identifiers only.
+- No migration path sends a notification or advances the live baseline.

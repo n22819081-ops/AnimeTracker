@@ -110,3 +110,9 @@ Milestone 5 applies schema v4 only to temporary or ignored migration-test databa
 - `coverage_mapping_snapshots` records coverage for the precise confirmed target.
 
 Mappings never collapse provider identity, franchise identity, inventory identity, season scope, and coverage identity into one path field. Migrations run transactionally and refuse the configured live database.
+
+## Schema Version 5 Prototype
+
+Schema v5 adds `notification_events_v2`, an atomic `notification_outbox`, delivery attempts, channel settings, event filters, suppressions, versioned templates, weekly summary runs/items, shared baseline v2, shared delivery evidence, credential references, and manual announcement drafts. Private, shared, and local Windows purposes have separate settings, references, histories, filters, silent policy, and rate limits.
+
+Outbox uniqueness combines channel purpose with a stable event key. Claim leases are acquired under `BEGIN IMMEDIATE`; network delivery occurs after commit, and completion verifies worker ownership. A delivered row cannot be reclaimed. Retryable failure uses `RETRY_WAIT`; exhausted or permanent failure uses `FAILED_PERMANENT`. Raw credentials are structurally absent from every modern table.

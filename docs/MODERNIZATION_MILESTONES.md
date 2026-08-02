@@ -40,6 +40,8 @@ Status: implemented and regression-validated beside the unchanged legacy matcher
 
 Implement a transactional outbox, atomic claims, retries, meaningful private events, and separate shared announcements.
 
+Status: implemented and regression-validated beside the unchanged legacy notifier. Schema v5 exists only on ignored migration-test copies. No production credential, webhook, GUI, or scheduled process uses this layer.
+
 ## Milestone 7: PySide6 GUI
 
 Build the dark desktop interface, background workers, progress/cancellation, accessible review tools, and diagnostics.

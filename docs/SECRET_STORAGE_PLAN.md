@@ -34,3 +34,9 @@ Private and shared credentials remain separate and cannot share templates, event
 - Log only credential identifiers, channel purpose, HTTP status, and exception type.
 - Never include webhook URLs in subprocess arguments, migration reports, exports, crash reports, or notification payload diagnostics.
 - Secret migration failures must leave the original JSON intact and report only a non-secret error type.
+
+## Milestone 6 Result
+
+Milestone 6 defines the `CredentialStore` interface, a redacted `SecretValue`, and an in-memory test store. Schema v5 accepts only `WINDOWS_CREDENTIAL_MANAGER`, `WINDOWS_DPAPI`, `LEGACY_IMPORT_PENDING`, or `TEST_ONLY` references. The legacy adapter accepts explicitly supplied metadata and discards webhook values after calculating presence; it never opens the production JSON automatically.
+
+No live secret migration occurred. Windows Credential Manager and DPAPI production implementations remain part of the later reversible operations cutover.
