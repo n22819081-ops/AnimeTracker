@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "result": "PASS",
   "scope": ["PyInstaller onedir", "Inno source payload", "portable ZIP", "release directory"],
-  "portable_members": 223,
+  "portable_members": 224,
   "portable_crc": "PASS",
   "byte_patterns_checked": ["source path", "developer username", "Jellyfin roots", "webhook endpoint", "virtual environment", "Storage Checker", "database filenames"],
   "forbidden_file_classes_found": [],

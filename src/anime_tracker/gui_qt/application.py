@@ -68,11 +68,11 @@ def main(argv=None)->int:
         app,window=create_application(profile.root);window.show();return app.exec()
     app,window,profile=create_production_application(profile_path)
     if window is None:
-        from ..production.adoption import ProfileAdoptionService,detect_project_profile
+        from ..production.adoption import ProfileAdoptionService,validate_project_profile
         from ..production.profile import ProductionProfile
         from .production_dialogs import FirstRunDialog,ProfileAdoptionDialog
-        existing_path=detect_project_profile();existing=ProductionProfile(existing_path) if existing_path and existing_path.resolve()!=profile.root.resolve() else None
-        first=FirstRunDialog(profile,existing)
+        validation=validate_project_profile();existing=ProductionProfile(validation.path) if validation.valid and validation.path.resolve()!=profile.root.resolve() else None
+        first=FirstRunDialog(profile,existing,validation=validation)
         if first.exec()!=FirstRunDialog.Accepted:return 0
         if first.choice=="CLEAN":profile.initialize_new()
         elif first.choice=="ADOPT" and existing:

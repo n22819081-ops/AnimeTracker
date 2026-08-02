@@ -70,10 +70,11 @@ def write_release_manifest(value:dict)->None:
         f"- Tests: {value['test_totals']}\n"
         f"- Installer/reinstall/uninstall: {value['installer_test_result']}\n"
         f"- Profile adoption: {value['profile_adoption_result']}\n"
+        f"- Existing-profile detection: {value.get('existing_profile_detection_result','Not recorded')}\n"
         f"- Defender: no threats found in all scanned targets\n"
         f"- Privacy: {value['privacy_audit']}\n"
         f"- Security: {value['security_audit']}\n\n"
-        "Prior development hashes are superseded by the hashes in this manifest and `SHA256SUMS.txt`. See the release notes for limitations.\n")
+        f"{value.get('supersedes','Prior development hashes')} are superseded by the hashes in this manifest and `SHA256SUMS.txt`. See the release notes for limitations.\n")
     markdown_path.write_text(markdown,encoding="utf-8")
 
 

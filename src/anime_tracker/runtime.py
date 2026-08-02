@@ -10,8 +10,17 @@ APP_VERSION = "1.0.0"
 BUILD_IDENTIFIER = "1.0.0-rc1"
 SCHEMA_VERSION = 6
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PROJECT_PRODUCTION_PROFILE = Path(os.environ.get("SystemDrive","C:")) / "AnimeTracker" / "production_profile"
 RELEASE_MANIFEST_NAME = "RELEASE_MANIFEST_1.0.0.json"
+
+
+def system_drive_root(value: str | None = None) -> Path:
+    drive = (value or os.environ.get("SystemDrive") or "C:").rstrip("\\/")
+    if drive.endswith(":"):
+        drive += "\\"
+    return Path(drive).resolve(strict=False)
+
+
+PROJECT_PRODUCTION_PROFILE = system_drive_root() / "AnimeTracker" / "production_profile"
 
 
 def is_frozen() -> bool:
@@ -41,7 +50,7 @@ def validate_profile_override(path: Path) -> Path:
     resolved = value.resolve(strict=False)
     if resolved == application_directory().resolve(strict=False):
         raise ValueError("The profile cannot be the application installation directory.")
-    protected = {(Path(os.environ.get("SystemDrive","C:"))/"AnimeTracker"/"data").resolve(strict=False)}
+    protected = {(system_drive_root()/"AnimeTracker"/"data").resolve(strict=False)}
     if resolved in protected:
         raise ValueError("The selected path is not an application-owned profile directory.")
     return resolved
