@@ -378,6 +378,7 @@ class FilesystemInventoryService:
             parsed.season_number,
             parsed.episode_numbers,
             parsed.special_kind,
+            parsed.absolute_episode_numbers,
         )
         if parsed.classification == FileClassification.UNRECOGNIZED_MEDIA:
             diagnostics.append(ScanDiagnostic(

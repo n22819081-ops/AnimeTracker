@@ -51,6 +51,7 @@ class ParsedMediaName:
     season_number: int | None = None
     episode_numbers: tuple[int, ...] = ()
     special_kind: SpecialKind | None = None
+    absolute_episode_numbers: tuple[int, ...] = ()
 
 
 def extract_year(value: str) -> int | None:
@@ -124,6 +125,12 @@ def parse_media_name(
 
     if special_kind is not None or folder_season == 0:
         return ParsedMediaName(FileClassification.SPECIAL, folder_season or 0, (), special_kind)
+    absolute = LEADING_EPISODE_PATTERN.search(stem)
+    if absolute and int(absolute.group("start")) > 0:
+        return ParsedMediaName(
+            FileClassification.UNRECOGNIZED_MEDIA,
+            absolute_episode_numbers=(int(absolute.group("start")),),
+        )
     return ParsedMediaName(FileClassification.UNRECOGNIZED_MEDIA, folder_season, (), special_kind)
 
 

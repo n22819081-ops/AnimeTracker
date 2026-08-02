@@ -21,3 +21,5 @@ The Milestone 3 AniList service writes only explicitly configured schema-v3 cach
 Optional Jellyfin API support may be added later only for read-only queries. Filesystem scanning remains available without an API key.
 
 The Milestone 4 filesystem inventory uses only directory enumeration and file metadata reads. Automated coverage uses temporary fixture roots. The inventory does not create a cache, database, marker, lock, sidecar, or log file under a media root.
+
+The Milestone 5 matching layer consumes only already-built typed inventory snapshots. It does not enumerate live media roots itself and contains no media write, move, rename, delete, subprocess, external-tool, Discord, scheduler, or GUI operation. Its SQLite repository writes only to an explicitly supplied application database path; schema v4 refuses the live database and is exercised only on temporary or ignored migration-test copies. Matching diagnostics prefer relative paths and contain no notification credentials.

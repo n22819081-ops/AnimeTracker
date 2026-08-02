@@ -77,6 +77,7 @@ class InventoryFile:
     season_number: int | None = None
     episode_numbers: tuple[int, ...] = ()
     special_kind: SpecialKind | None = None
+    absolute_episode_numbers: tuple[int, ...] = ()
 
     @property
     def fingerprint(self) -> tuple[str, int | None, int | None]:

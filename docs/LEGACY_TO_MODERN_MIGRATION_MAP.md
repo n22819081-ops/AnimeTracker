@@ -156,3 +156,18 @@ Real Discord secrets live in the separate JSON file and are not part of prototyp
 ## Deleted Anime And Orphan Rows
 
 The legacy database has no removed/archived anime table. Child rows whose AniList ID has no active `anime` owner are preserved in `archived_legacy_records` with source table, source key, original AniList ID, complete JSON payload, timestamp, and `Manual review required`. Reassociation is prohibited unless future evidence proves origin.
+
+## Milestone 5 Matching Adapter
+
+Schema v4 conservatively adapts only the active prototype matching records on a disposable v3 copy:
+
+| Legacy source | Schema v4 result |
+|---|---|
+| `media_server_mappings` | Active mappings become confirmed `LEGACY_IMPORT` mappings with `UNKNOWN_TARGET`; no season is invented. The source table remains `legacy_media_server_mappings_v1`. |
+| `rejected_match_decisions` | Active path-specific decisions become `EXACT_PATH` rejections. The source table remains `legacy_rejected_match_decisions_v1`. |
+| `match_candidates` | Active rows become stale historical candidates with `INSUFFICIENT_EVIDENCE`; the legacy score is retained only in evidence JSON. The source table remains `legacy_match_candidates_v1`. |
+| `review_cases` | Genuine ambiguity remains active. Ordinary `No Jellyfin match found` rows remain audit evidence and are not imported as active review cases. |
+| Orphan rows | Remain in `archived_legacy_records`; v4 never assigns a new owner. |
+| Manual `On Server` state | Remains in migrated tracking payload and is not recalculated from v4 coverage. |
+
+The adapter preserves one known shared-folder representation because `media_server_mappings` has no uniqueness constraint on inventory item or normalized path. Future manual decisions can refine an unknown legacy folder into precise season targets while superseding, never overwriting, its history.

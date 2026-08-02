@@ -47,7 +47,9 @@ class ServerInventoryParserTests(unittest.TestCase):
     def test_leading_number_requires_a_season_folder(self):
         parsed = self.parse("03 - A Title.mkv", season=2)
         self.assertEqual((parsed.season_number, parsed.episode_numbers), (2, (3,)))
-        self.assertEqual(self.parse("03 - A Title.mkv").classification, FileClassification.UNRECOGNIZED_MEDIA)
+        absolute = self.parse("03 - A Title.mkv")
+        self.assertEqual(absolute.classification, FileClassification.UNRECOGNIZED_MEDIA)
+        self.assertEqual(absolute.absolute_episode_numbers, (3,))
 
     def test_season_directories_with_and_without_leading_zero(self):
         self.assertEqual(season_directory_number("Season 02"), 2)

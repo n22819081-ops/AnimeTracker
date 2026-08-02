@@ -4,7 +4,7 @@ Anime Tracker is a local Windows desktop app for tracking anime you want to add 
 
 ## Modernization Status
 
-Modernization Milestones 1 through 4 establish verified backups, reconciled copy-only migration data, typed domain/status rules, a modern cache-aware AniList service, and a typed read-only server inventory with deterministic season and episode observations. The modern packages are not yet wired into the Tkinter application and do not replace the live database, legacy AniList client, or legacy scanner.
+Modernization Milestones 1 through 5 establish verified backups, reconciled copy-only migration data, typed domain/status rules, a modern cache-aware AniList service, a typed read-only server inventory, and persistent matching/review services with explicit season scope. The modern packages are not yet wired into the Tkinter application and do not replace the live database, legacy AniList client, or legacy scanner.
 
 Milestone documentation is under `docs/`. The disposable prototype is created under ignored `migration_test/`, and the immutable checkpoint is under ignored `modernization_backups/`.
 
@@ -119,6 +119,7 @@ If `pytest` is unavailable:
 - `src/anime_tracker/domain/`: persistence-neutral modern domain models and deterministic rules (not yet a production cutover).
 - `src/anime_tracker/services/anilist/`: typed modern AniList client, cache, batches, schedules, and franchise graph (not yet wired into production).
 - `src/anime_tracker/services/server_inventory/`: transient typed filesystem snapshots, conservative media parsing, diagnostics, cancellation, and incremental reuse (not yet wired into production).
+- `src/anime_tracker/services/matching/`: deterministic candidate ranking, typed season/movie targets, durable decisions, mapping history, coverage, and review workflows (not yet wired into production).
 - `src/anime_tracker/scanner.py`: read-only Jellyfin matching.
 - `src/anime_tracker/config.py`: local notification config storage.
 - `src/anime_tracker/notifications.py`: Discord embeds and optional Windows toast notifications.

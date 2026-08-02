@@ -34,6 +34,8 @@ Status: implemented and regression-validated as a transient service beside the u
 
 Implement many-to-one mappings, explicit season targets, Season 00 suggestions, durable rejections, title-wide auto-match blocks, and review-case workflows.
 
+Status: implemented and regression-validated beside the unchanged legacy matcher. Schema v4 exists only on ignored migration-test copies. Suggestions require manual confirmation; no live persistence, GUI, scheduling, notification, or media operation uses this layer.
+
 ## Milestone 6: Notifications
 
 Implement a transactional outbox, atomic claims, retries, meaningful private events, and separate shared announcements.
@@ -50,4 +52,4 @@ Integrate scheduling, verified backup/restore, credential migration, diagnostics
 
 Package a Windows application, validate on a clean user profile, test upgrade/rollback, and publish a versioned release.
 
-Milestone 5 and later are not part of the current implementation.
+Milestone 6 and later are not part of the current implementation.

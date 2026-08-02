@@ -95,3 +95,18 @@ erDiagram
 Server presence values are `NOT_ON_SERVER`, `PARTIAL`, `ON_SERVER`, `UNKNOWN_COVERAGE`, and `NEEDS_REVIEW`. Episode coverage values are `NONE`, `PARTIAL`, `CURRENT_COMPLETE`, `COMPLETE`, and `UNKNOWN`. A legacy `On Server` row migrates to `UNKNOWN_COVERAGE` until episode evidence is available.
 
 These are schema-v1 migration vocabulary values, not the final domain enum names. Milestone 2 uses `NOT_FOUND`, `PARTIAL`, `COMPLETE`, `UNKNOWN_COVERAGE`, `PATH_MISSING`, and `NOT_APPLICABLE`, with review held independently. A future persistence milestone will migrate schema vocabulary transactionally; Milestone 2 does not rewrite prototype or live data.
+
+## Schema Version 4 Prototype
+
+Milestone 5 applies schema v4 only to temporary or ignored migration-test databases. It replaces the prototype v1 matching tables with richer tables while retaining the originals as `legacy_*_v1` audit tables.
+
+- `matching_sessions` binds candidates to one inventory fingerprint and AniList metadata version.
+- `server_match_candidates` stores immutable target/evidence JSON, deterministic score components, confidence, preselection, and stale state.
+- `media_server_mappings` stores typed target scope independently from AniList identity. Multiple AniList IDs may share an inventory item while using different seasons.
+- `mapping_history` and `mapping_evidence` preserve creation, health, broken, superseded, clear, and confirmation evidence.
+- `rejected_match_decisions` stores narrowly scoped durable rejections; `automatic_match_suppressions` is a separate title-wide switch.
+- `review_cases` and `review_case_candidates` preserve typed lifecycle state and candidate associations.
+- `mapping_overrides` stores distinct Not on Server, no-valid-candidate, skip, and clear-mapping decisions.
+- `coverage_mapping_snapshots` records coverage for the precise confirmed target.
+
+Mappings never collapse provider identity, franchise identity, inventory identity, season scope, and coverage identity into one path field. Migrations run transactionally and refuse the configured live database.
