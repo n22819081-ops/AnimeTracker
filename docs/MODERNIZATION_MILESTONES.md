@@ -16,6 +16,8 @@ Status: implemented for validation. The legacy application remains active and un
 
 Create typed core models and deterministic rules for AniList status, tracker workflow, server presence, episode coverage, review state, and archival behavior. Do not couple the engine to a GUI.
 
+Status: implemented and regression-validated. The package is persistence-neutral and is not wired into the legacy application. Coverage, mapping, review, override, archive, transition, and legacy-adaptation rules are documented in `STATUS_ENGINE_RULES.md`.
+
 ## Milestone 3: AniList Service
 
 Add cache TTLs, batched refreshes, rate-limit-aware retries, airing schedules, relation IDs, and a persistent franchise graph.
@@ -44,4 +46,4 @@ Integrate scheduling, verified backup/restore, credential migration, diagnostics
 
 Package a Windows application, validate on a clean user profile, test upgrade/rollback, and publish a versioned release.
 
-Milestone 2 and later are not part of the current implementation.
+Milestone 3 and later are not part of the current implementation.

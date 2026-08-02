@@ -2,6 +2,8 @@
 
 The prototype used only the verified backup. It did not replace or migrate the live application database.
 
+Milestone 2 revalidated all 69 active rows through the row-only domain compatibility adapter and represented all 421 archived orphan records without reassignment or loss. It did not change the prototype schema or either database.
+
 ## Source Reconciliation
 
 | Legacy table | Source | Active | Archived | Excluded | Warnings | Balanced |

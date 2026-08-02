@@ -2,7 +2,7 @@
 
 ## Scope
 
-Schema version 1 is a migration-validation schema only. The legacy application does not read or write it. The prototype is created under `migration_test`, and production cutover is deferred until Milestone 8.
+Schema version 1 is a migration-validation schema only. The legacy application does not read or write it. The prototype is created under `migration_test`, and production cutover is deferred until Milestone 8. Milestone 2 adds persistence-neutral typed domain objects and does not alter this prototype, so schema version 2 is not needed yet.
 
 ## Product Invariants
 
@@ -91,3 +91,5 @@ erDiagram
 ## Status Vocabulary
 
 Server presence values are `NOT_ON_SERVER`, `PARTIAL`, `ON_SERVER`, `UNKNOWN_COVERAGE`, and `NEEDS_REVIEW`. Episode coverage values are `NONE`, `PARTIAL`, `CURRENT_COMPLETE`, `COMPLETE`, and `UNKNOWN`. A legacy `On Server` row migrates to `UNKNOWN_COVERAGE` until episode evidence is available.
+
+These are schema-v1 migration vocabulary values, not the final domain enum names. Milestone 2 uses `NOT_FOUND`, `PARTIAL`, `COMPLETE`, `UNKNOWN_COVERAGE`, `PATH_MISSING`, and `NOT_APPLICABLE`, with review held independently. A future persistence milestone will migrate schema vocabulary transactionally; Milestone 2 does not rewrite prototype or live data.

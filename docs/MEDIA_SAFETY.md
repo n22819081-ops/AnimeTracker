@@ -13,4 +13,6 @@ Anime Tracker must not invoke, import, modify, or control the separate `jellyfin
 
 All future scan sessions must be marked read-only. Database, log, export, cache, backup, and temporary writes must remain under application-controlled locations outside the Jellyfin roots. Output-path guards must reject the media roots and Storage Checker before creating any file.
 
+The Milestone 2 domain package has no filesystem APIs, media-root strings, scanner imports, subprocess calls, or write operations. Its automated safety tests statically enforce the absence of GUI, network, SQLite, scanner, notification, and scheduler dependencies.
+
 Optional Jellyfin API support may be added later only for read-only queries. Filesystem scanning remains available without an API key.

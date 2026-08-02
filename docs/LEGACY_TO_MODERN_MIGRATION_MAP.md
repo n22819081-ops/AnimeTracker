@@ -11,6 +11,10 @@
 - Every source table is validated through `migration_audit`: source = active + archived + explicitly excluded technical rows.
 - Conflicts never overwrite an earlier record. The conflicting row is archived whole.
 
+## Milestone 2 Compatibility Adapter
+
+`anime_tracker.domain.legacy_adapter` converts row-like values into typed domain inputs without querying SQLite. Legacy `On Server` preserves its manual confirmation through an explicit legacy override while coverage remains `UNKNOWN_COVERAGE`. Legacy `Not Found` becomes `NOT_FOUND` with no review. Legacy `Needs Review` becomes `LEGACY_DATA_REVIEW` when the precise cause is unavailable, and `Missing - Needs Review` becomes `PATH_MISSING` plus `MISSING_CONFIRMED_PATH`. The adapter never invents episode inventory or relation edges.
+
 ## `anime`
 
 | Source column | Meaning | Destination | Transformation / null behavior | Conflict / orphan behavior | Validation |
