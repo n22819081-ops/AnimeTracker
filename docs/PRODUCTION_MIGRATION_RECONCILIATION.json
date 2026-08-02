@@ -1,0 +1,200 @@
+{
+  "destination_counts": {
+    "anilist_cache": 0,
+    "anilist_media": 69,
+    "anilist_refresh_batches": 0,
+    "announcement_baselines": 1312,
+    "application_settings": 16,
+    "archived_legacy_records": 421,
+    "credential_references": 0,
+    "episode_mappings": 0,
+    "franchise_groups": 0,
+    "franchise_members": 0,
+    "jellyfin_folder_mappings": 1,
+    "manual_announcement_queue": 0,
+    "manual_announcement_titles": 3,
+    "manual_overrides": 0,
+    "match_candidates": 14,
+    "media_relations": 0,
+    "media_server_mappings": 1,
+    "media_titles": 338,
+    "migration_audit": 10,
+    "notification_deliveries": 0,
+    "notification_outbox": 0,
+    "rejected_match_decisions": 11,
+    "review_cases": 64,
+    "scan_sessions": 0,
+    "schema_migrations": 1,
+    "server_episodes": 0,
+    "server_library_items": 1,
+    "server_movies": 0,
+    "server_seasons": 0,
+    "server_specials": 0,
+    "status_history": 153,
+    "tracked_media": 69,
+    "tracking_state": 69
+  },
+  "destination_filename": "anime_tracker_modern.c31c0fd3d8c94199b4ac0fb094f52797.tmp",
+  "live_sha256_unchanged": true,
+  "report_format_version": 1,
+  "sampled_record_comparisons": [
+    {
+      "anilist_id": 355,
+      "provider_identity_preserved": true,
+      "tracked_row_preserved": true
+    },
+    {
+      "anilist_id": 2526,
+      "provider_identity_preserved": true,
+      "tracked_row_preserved": true
+    },
+    {
+      "anilist_id": 5081,
+      "provider_identity_preserved": true,
+      "tracked_row_preserved": true
+    },
+    {
+      "anilist_id": 18677,
+      "provider_identity_preserved": true,
+      "tracked_row_preserved": true
+    },
+    {
+      "anilist_id": 20943,
+      "provider_identity_preserved": true,
+      "tracked_row_preserved": true
+    }
+  ],
+  "schema_version": 1,
+  "shared_library_paths_with_multiple_active_mappings": 0,
+  "source_filename": "anime_tracker-online.db",
+  "source_sha256_unchanged": true,
+  "tables": [
+    {
+      "archived_count": 0,
+      "completed_at": "2026-08-02T06:36:10.882289+00:00",
+      "excluded_technical_count": 0,
+      "id": 1,
+      "migrated_active_count": 69,
+      "migration_version": 1,
+      "source_count": 69,
+      "source_table": "anime",
+      "warning_count": 0
+    },
+    {
+      "archived_count": 0,
+      "completed_at": "2026-08-02T06:36:10.882289+00:00",
+      "excluded_technical_count": 0,
+      "id": 8,
+      "migrated_active_count": 1312,
+      "migration_version": 1,
+      "source_count": 1312,
+      "source_table": "jellyfin_announcement_snapshot",
+      "warning_count": 0
+    },
+    {
+      "archived_count": 0,
+      "completed_at": "2026-08-02T06:36:10.882289+00:00",
+      "excluded_technical_count": 0,
+      "id": 9,
+      "migrated_active_count": 0,
+      "migration_version": 1,
+      "source_count": 0,
+      "source_table": "manual_announcement_queue",
+      "warning_count": 0
+    },
+    {
+      "archived_count": 0,
+      "completed_at": "2026-08-02T06:36:10.882289+00:00",
+      "excluded_technical_count": 0,
+      "id": 10,
+      "migrated_active_count": 3,
+      "migration_version": 1,
+      "source_count": 3,
+      "source_table": "manual_announcement_titles",
+      "warning_count": 0
+    },
+    {
+      "archived_count": 100,
+      "completed_at": "2026-08-02T06:36:10.882289+00:00",
+      "excluded_technical_count": 0,
+      "id": 6,
+      "migrated_active_count": 14,
+      "migration_version": 1,
+      "source_count": 114,
+      "source_table": "match_candidates",
+      "warning_count": 0
+    },
+    {
+      "archived_count": 0,
+      "completed_at": "2026-08-02T06:36:10.882289+00:00",
+      "excluded_technical_count": 0,
+      "id": 3,
+      "migrated_active_count": 0,
+      "migration_version": 1,
+      "source_count": 0,
+      "source_table": "notification_events",
+      "warning_count": 0
+    },
+    {
+      "archived_count": 8,
+      "completed_at": "2026-08-02T06:36:10.882289+00:00",
+      "excluded_technical_count": 0,
+      "id": 5,
+      "migrated_active_count": 11,
+      "migration_version": 1,
+      "source_count": 19,
+      "source_table": "rejected_matches",
+      "warning_count": 0
+    },
+    {
+      "archived_count": 92,
+      "completed_at": "2026-08-02T06:36:10.882289+00:00",
+      "excluded_technical_count": 0,
+      "id": 4,
+      "migrated_active_count": 1,
+      "migration_version": 1,
+      "source_count": 93,
+      "source_table": "server_matches",
+      "warning_count": 0
+    },
+    {
+      "archived_count": 0,
+      "completed_at": "2026-08-02T06:36:10.882289+00:00",
+      "excluded_technical_count": 0,
+      "id": 2,
+      "migrated_active_count": 16,
+      "migration_version": 1,
+      "source_count": 16,
+      "source_table": "settings",
+      "warning_count": 0
+    },
+    {
+      "archived_count": 221,
+      "completed_at": "2026-08-02T06:36:10.882289+00:00",
+      "excluded_technical_count": 0,
+      "id": 7,
+      "migrated_active_count": 153,
+      "migration_version": 1,
+      "source_count": 374,
+      "source_table": "status_history",
+      "warning_count": 0
+    }
+  ],
+  "unexplained_loss_tables": [],
+  "unresolved_archived_records": 421,
+  "warning_count": 0,
+  "production_profile": "production_profile",
+  "production_counts": {
+    "active_titles": 69,
+    "archived_orphans": 421,
+    "shared_baselines": 1312,
+    "mappings": 1,
+    "rejections": 11,
+    "candidates": 14,
+    "foreign_key_violations": 0
+  },
+  "production_integrity": "ok",
+  "cutover_state": "PENDING_APPROVAL",
+  "credential_migration_state": "MIGRATED_DISABLED",
+  "notification_activation_stage": 1
+}

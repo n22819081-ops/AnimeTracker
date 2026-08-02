@@ -52,8 +52,10 @@ Status: implemented and regression-validated as a separate development applicati
 
 Integrate scheduling, verified backup/restore, credential migration, diagnostics, dual-read comparison, and production database cutover.
 
+Status: production profile, schema v6, copy-based migration, secure DPAPI credential references, live AniList validation, live read-only inventory, suggestion-only matching, backup/restore, diagnostics, staged notifications, scheduling command, validation-task script, migration wizard, comparison, and rollback tooling are implemented and regression-validated. Final cutover, Discord activation, and Task Scheduler changes remain pending explicit approval. The legacy application remains the active rollback path.
+
 ## Milestone 9: Packaging And Release
 
 Package a Windows application, validate on a clean user profile, test upgrade/rollback, and publish a versioned release.
 
-Milestone 8 and later are not part of the current implementation.
+Milestone 9 is not part of the current implementation.

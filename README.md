@@ -4,7 +4,7 @@ Anime Tracker is a local Windows desktop app for tracking anime you want to add 
 
 ## Modernization Status
 
-Modernization Milestones 1 through 7 establish verified backups, reconciled copy-only migration data, typed domain/status rules, modern AniList and inventory services, persistent season-scoped matching, a transactional notification outbox, and a separate PySide6 development GUI. The modern GUI uses a disposable profile and does not replace the live database or production notification behavior.
+Modernization Milestones 1 through 8 establish verified backups, reconciled copy-only migration, typed domain/status rules, live cache-first AniList and read-only inventory services, season-scoped matching, secure DPAPI credential references, a transactional notification outbox, and a PySide6 production profile. Final cutover, Discord activation, and Task Scheduler registration remain explicitly pending.
 
 Milestone documentation is under `docs/`. The disposable prototype is created under ignored `migration_test/`, and the immutable checkpoint is under ignored `modernization_backups/`.
 
@@ -12,7 +12,7 @@ The separate `jellyfin storage checker` is a different product. It is excluded f
 
 The app scans Jellyfin folders read-only. It never renames, moves, modifies, replaces, or deletes anything in your media folders.
 
-The modern inventory also recognizes the protected Anime root at `I:\Jellyfin_Media\Anime`. Production cutover remains deferred to Milestone 8.
+The production inventory is restricted to the configured TV and Movies roots. Final release packaging remains deferred to Milestone 9.
 
 ## Install
 
@@ -36,7 +36,7 @@ Or directly:
 .\.venv\Scripts\python.exe -m anime_tracker.app
 ```
 
-### Modern Development GUI
+### Modern Production GUI
 
 ```powershell
 .\Run-AnimeTracker-Modern.ps1
@@ -48,11 +48,21 @@ Or directly:
 .\.venv\Scripts\python.exe -m anime_tracker.gui_qt.application
 ```
 
-The window is labeled `Development / Migration Test Profile`. It copies the ignored migration-test prototype into `modern_profile_test`, never opens the live legacy database for writing, does not scan production roots automatically, and cannot send production Discord messages. Reset only that disposable profile with:
+The default launcher opens `production_profile`. The migrated profile is currently marked `MIGRATED_PENDING_CUTOVER`; it does not activate Discord or replace the legacy task automatically.
+
+Launch the disposable development profile with:
 
 ```powershell
-.\Run-AnimeTracker-Modern.ps1 --reset-profile
+.\Run-AnimeTracker-Modern.ps1 --test-profile
 ```
+
+Reset only that disposable profile with:
+
+```powershell
+.\Run-AnimeTracker-Modern.ps1 --test-profile --reset-test-profile
+```
+
+The broad `--reset-profile` option was removed. Production reset and restore require verified backups and explicit confirmation.
 
 ## Scheduled Daily Check
 
@@ -140,6 +150,7 @@ If `pytest` is unavailable:
 - `src/anime_tracker/services/matching/`: deterministic candidate ranking, typed season/movie targets, durable decisions, mapping history, coverage, and review workflows (not yet wired into production).
 - `src/anime_tracker/notifications_v2/`: transactional outbox, deduplication, private/shared templates, retry policy, privacy filtering, baselines, summaries, and credential references (not yet wired into production).
 - `src/anime_tracker/gui_qt/`: separate PySide6 development GUI, repositories, background workers, pages, dialogs, theme, and cover cache.
+- `src/anime_tracker/production/`: production profile, migration, live operations, locking, credentials, scheduling, backup/restore, diagnostics, cutover, and rollback gates.
 - `src/anime_tracker/scanner.py`: read-only Jellyfin matching.
 - `src/anime_tracker/config.py`: local notification config storage.
 - `src/anime_tracker/notifications.py`: Discord embeds and optional Windows toast notifications.

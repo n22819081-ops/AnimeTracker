@@ -11,6 +11,7 @@ backups/
 modernization_backups/
 migration_test/
 modern_profile_test/
+production_profile/
 *.lock
 **/scheduled_check.lock
 *webhook*.json

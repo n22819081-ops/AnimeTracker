@@ -7,4 +7,8 @@ if (-not (Test-Path -LiteralPath $python)) {
 }
 
 Set-Location -LiteralPath $projectRoot
-& $python -m anime_tracker.gui_qt.application @args
+$forward = @($args)
+if ($forward -contains "--reset-profile") {
+    throw "--reset-profile was removed. Use --test-profile --reset-test-profile. Production reset requires a verified backup and explicit migration tooling."
+}
+& $python -m anime_tracker.gui_qt.application @forward

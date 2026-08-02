@@ -89,6 +89,19 @@ class ReviewRuleTests(unittest.TestCase):
         )
         self.assertIn(MatchingReviewType.LEGACY_SEASON_SCOPE_UNKNOWN, {review.review_type for review in reviews})
 
+    def test_another_titles_legacy_mapping_does_not_create_review(self):
+        value = media(anilist_id=200)
+        owner = media(anilist_id=100)
+        target = MappingTarget(
+            MappingTargetType.UNKNOWN_TARGET, LibraryKind.TV, "TV", "Example", "x:\\example",
+            "legacy-item", None, TrackingContentKind.SERIES, "legacy", "Example", PathState.UNKNOWN,
+        )
+        reviews = generate_matching_reviews(
+            profile_id="default", media=value, generated=None,
+            mappings=(mapping_for(owner, target),), now=NOW,
+        )
+        self.assertNotIn(MatchingReviewType.LEGACY_SEASON_SCOPE_UNKNOWN, {review.review_type for review in reviews})
+
     def test_movie_mapped_to_tv_creates_conflict_review(self):
         value = media("Example Movie", kind=MediaKind.MOVIE)
         target = MappingTarget(

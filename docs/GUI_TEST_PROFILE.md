@@ -7,7 +7,7 @@ Settings default to Dark with automatic refresh, automatic scanning, and every n
 Reset the disposable profile with:
 
 ```powershell
-.\Run-AnimeTracker-Modern.ps1 --reset-profile
+.\Run-AnimeTracker-Modern.ps1 --test-profile --reset-test-profile
 ```
 
 Reset never replaces or deletes the legacy database. The title bar and banner continuously identify the development profile and disabled production cutover.

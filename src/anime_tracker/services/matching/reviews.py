@@ -29,6 +29,7 @@ def generate_matching_reviews(
     missing_season_mapping_ids: Iterable[str] = (),
 ) -> tuple[MatchingReviewCase, ...]:
     mappings = tuple(mapping for mapping in mappings if mapping.active)
+    media_mappings = tuple(mapping for mapping in mappings if mapping.anilist_id == media.anilist_id)
     missing_paths = tuple(sorted(set(missing_path_mapping_ids)))
     missing_seasons = tuple(sorted(set(missing_season_mapping_ids)))
     cases: list[MatchingReviewCase] = []
@@ -46,13 +47,13 @@ def generate_matching_reviews(
             identity_basis=tuple(item.target.identity_key for item in viable[:8]),
         ))
 
-    targets = {mapping.target.identity_key for mapping in mappings}
+    targets = {mapping.target.identity_key for mapping in media_mappings}
     if len(targets) > 1:
         cases.append(_review(
             profile_id, media.anilist_id, MatchingReviewType.CONFLICTING_ACTIVE_MAPPINGS,
             ReviewSeverity.BLOCKING,
             ("One AniList identity has conflicting active server targets.",),
-            (), tuple(mapping.mapping_id for mapping in mappings), now,
+            (), tuple(mapping.mapping_id for mapping in media_mappings), now,
         ))
 
     claims: dict[str, set[int]] = {}
@@ -83,11 +84,11 @@ def generate_matching_reviews(
             (), (mapping_id,), now,
         ))
 
-    if any(mapping.confirmation_state == ConfirmationState.CONFIRMED and mapping.target.target_type.value == "UNKNOWN_TARGET" for mapping in mappings):
+    if any(mapping.confirmation_state == ConfirmationState.CONFIRMED and mapping.target.target_type.value == "UNKNOWN_TARGET" for mapping in media_mappings):
         cases.append(_review(
             profile_id, media.anilist_id, MatchingReviewType.LEGACY_SEASON_SCOPE_UNKNOWN,
             ReviewSeverity.BLOCKING, ("A confirmed legacy folder mapping has no explicit season scope.",),
-            (), tuple(mapping.mapping_id for mapping in mappings if mapping.target.target_type.value == "UNKNOWN_TARGET"), now,
+            (), tuple(mapping.mapping_id for mapping in media_mappings if mapping.target.target_type.value == "UNKNOWN_TARGET"), now,
         ))
 
     if candidates and any(item.evidence.absolute_numbering for item in candidates):
@@ -112,7 +113,7 @@ def generate_matching_reviews(
             identity_basis=tuple(item.target.normalized_path for item in unstable),
         ))
 
-    if media.media_format in {MediaKind.OVA, MediaKind.ONA, MediaKind.SPECIAL} and candidates and not any(mapping.is_confirmed for mapping in mappings):
+    if media.media_format in {MediaKind.OVA, MediaKind.ONA, MediaKind.SPECIAL} and candidates and not any(mapping.is_confirmed for mapping in media_mappings):
         cases.append(_review(
             profile_id, media.anilist_id, MatchingReviewType.SPECIAL_PARENT_UNRESOLVED,
             ReviewSeverity.BLOCKING,
@@ -121,11 +122,11 @@ def generate_matching_reviews(
             identity_basis=tuple(item.target.identity_key for item in candidates),
         ))
 
-    if media.media_format == MediaKind.MOVIE and any(mapping.active and mapping.target.library_kind.value == "TV" for mapping in mappings):
+    if media.media_format == MediaKind.MOVIE and any(mapping.target.library_kind.value == "TV" for mapping in media_mappings):
         cases.append(_review(
             profile_id, media.anilist_id, MatchingReviewType.MOVIE_SERIES_CONFLICT,
             ReviewSeverity.BLOCKING, ("A movie is mapped to TV inventory and requires explicit review.",),
-            (), tuple(mapping.mapping_id for mapping in mappings), now,
+            (), tuple(mapping.mapping_id for mapping in media_mappings), now,
         ))
 
     unique = {case.review_id: case for case in cases}

@@ -39,7 +39,7 @@ class DiscordDeliveryAdapter:
                     webhook_url,
                     json=discord_payload(part),
                     timeout=self.timeout,
-                    headers={"User-Agent": "AnimeTracker/0.1 notification-v2"},
+                    headers={"User-Agent": "AnimeTracker/0.8 notification-v2"},
                 )
                 status = int(response.status_code)
                 if 200 <= status < 300:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QThreadPool
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGridLayout, QGroupBox, QHBoxLayout,
     QLabel, QLineEdit, QListWidget, QMessageBox, QPushButton, QSpinBox, QTabWidget,
@@ -11,11 +11,12 @@ from PySide6.QtWidgets import (
 
 from .data import AnimeRow, ModernRepository
 from .widgets import CoverageBar, StatusBadge
+from .workers import BackgroundWorker
 
 
 class AddAnimeDialog(QDialog):
-    def __init__(self, search_provider=None, parent=None) -> None:
-        super().__init__(parent); self.setWindowTitle("Add Anime"); self.resize(900,640); self.search_provider=search_provider or (lambda *_: ()); self.page=1
+    def __init__(self, search_provider=None, parent=None, *, background_search=False) -> None:
+        super().__init__(parent); self.setWindowTitle("Add Anime"); self.resize(900,640); self.search_provider=search_provider or (lambda *_: ()); self.page=1; self.background_search=background_search; self.search_worker=None
         layout=QVBoxLayout(self); controls=QHBoxLayout(); self.query=QLineEdit(); self.query.setPlaceholderText("Title, AniList URL, or AniList ID")
         self.year=QSpinBox(); self.year.setRange(0,2100); self.year.setSpecialValueText("Any year")
         self.format=QComboBox(); self.format.addItems(["Any format","TV","MOVIE","OVA","ONA","SPECIAL"])
@@ -32,12 +33,20 @@ class AddAnimeDialog(QDialog):
         text=self.query.text().strip()
         if not text:return
         if not keep_page:self.page=1
+        format_value=None if self.format.currentIndex()==0 else self.format.currentText()
+        if self.background_search:
+            self.search.setEnabled(False);self.status.setText("Searching AniList in the background...")
+            worker=BackgroundWorker(_search_operation,self.search_provider,text,self.year.value() or None,format_value,self.page)
+            worker.signals.result.connect(self._show_results);worker.signals.error.connect(self._search_error);worker.signals.finished.connect(lambda _:self.search.setEnabled(True));self.search_worker=worker;QThreadPool.globalInstance().start(worker);return
         try:
-            format_value=None if self.format.currentIndex()==0 else self.format.currentText()
             try: results=tuple(self.search_provider(text,self.year.value() or None,format_value,page=self.page))
             except TypeError: results=tuple(self.search_provider(text,self.year.value() or None,format_value))
         except Exception:
             self.status.setText("AniList is temporarily unavailable. The entered text has been preserved."); return
+        self._show_results(results)
+
+    def _show_results(self,results):
+        results=tuple(results)
         self.results.setRowCount(0); self.related.clear()
         for result in results:
             row=self.results.rowCount(); self.results.insertRow(row); self.results.setItem(row,0,QTableWidgetItem("▣")); self.results.setItem(row,1,QTableWidgetItem("○"))
@@ -45,6 +54,9 @@ class AddAnimeDialog(QDialog):
             self.results.item(row,1).setData(Qt.UserRole,result)
         self.page_label.setText(f"Page {self.page}"); self.previous.setEnabled(self.page>1); self.next.setEnabled(bool(results))
         self.status.setText("No AniList matches found." if not results else f"{len(results)} possible matches. Select one before adding.")
+
+    def _search_error(self,kind,detail):
+        self.status.setText(f"AniList is temporarily unavailable ({kind}). The entered text has been preserved.")
 
     def change_page(self,delta):
         self.page=max(1,self.page+delta); self.run_search(keep_page=True)
@@ -106,3 +118,11 @@ class LegacyImportPreviewDialog(QDialog):
             row=table.rowCount(); table.insertRow(row); table.setItem(row,0,QTableWidgetItem(label)); table.setItem(row,1,QTableWidgetItem(str(counts[key])))
         layout.addWidget(table); warning=QLabel("Preview only. Production cutover is disabled and the live database is not modified."); warning.setObjectName("profileBanner"); warning.setWordWrap(True); layout.addWidget(warning)
         buttons=QDialogButtonBox(QDialogButtonBox.Close); buttons.rejected.connect(self.reject); layout.addWidget(buttons)
+
+
+def _search_operation(provider,text,year,format_value,page,*,cancel_event,progress):
+    if cancel_event.is_set():return ()
+    progress(0,1,"Searching AniList")
+    try:results=tuple(provider(text,year,format_value,page=page))
+    except TypeError:results=tuple(provider(text,year,format_value))
+    progress(1,1,f"Found {len(results)} matches");return results
