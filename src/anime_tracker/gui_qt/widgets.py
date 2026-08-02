@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 )
 
 from .models import AnimeFilterProxy, AnimeTableModel
+from .covers import CoverDelegate
 
 
 class StatusBadge(QLabel):
@@ -50,7 +51,7 @@ class EmptyState(QFrame):
 class AnimeTable(QWidget):
     activated_row = Signal(object)
 
-    def __init__(self, rows=(), parent=None) -> None:
+    def __init__(self, rows=(), parent=None, *, cover_cache_dir=None) -> None:
         super().__init__(parent)
         self.model = AnimeTableModel(rows, self)
         self.proxy = AnimeFilterProxy(self); self.proxy.setSourceModel(self.model)
@@ -59,6 +60,9 @@ class AnimeTable(QWidget):
         self.view.setSelectionBehavior(QAbstractItemView.SelectRows); self.view.setSelectionMode(QAbstractItemView.SingleSelection)
         self.view.setEditTriggers(QAbstractItemView.NoEditTriggers); self.view.setContextMenuPolicy(Qt.CustomContextMenu)
         self.view.verticalHeader().setVisible(False); self.view.horizontalHeader().setStretchLastSection(True)
+        if cover_cache_dir is not None:
+            self.cover_delegate=CoverDelegate(cover_cache_dir,self.view);self.view.setItemDelegateForColumn(0,self.cover_delegate)
+            self.view.verticalHeader().setDefaultSectionSize(82);self.view.setColumnWidth(0,72)
         self.view.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
         self.view.horizontalHeader().setContextMenuPolicy(Qt.CustomContextMenu)
         self.view.horizontalHeader().customContextMenuRequested.connect(self._column_menu)

@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
-from .data import ModernRepository
+from .data import ModernRepository, TitleMetadata, resolve_display_title
 from .dialogs import AddAnimeDialog, AnimeDetailDialog, LegacyImportPreviewDialog, MatchingReviewDialog
 from .pages import (
     AnimeListPage, CoveragePage, DashboardPage, FranchisePage, HistoryPage, MoviesPage,
@@ -65,11 +65,17 @@ class MainWindow(QMainWindow):
         rows=lambda:self.repository.tracked_media()
         pages={
             "Dashboard":DashboardPage(self.repository),
-            "Upcoming":AnimeListPage("Upcoming",self.repository,lambda r:r.tracker_status=="Upcoming"),
-            "Currently Airing":AnimeListPage("Currently Airing",self.repository,lambda r:r.tracker_status=="Currently Airing","Airing schedule times display locally; cached timestamps remain UTC."),
-            "Finished / Ready to Add":AnimeListPage("Finished / Ready to Add",self.repository,lambda r:r.tracker_status=="Finished / Ready to Add" and r.server_status!="COMPLETE"),
+            "Upcoming":AnimeListPage("Upcoming",self.repository,lambda r:r.tracker_status=="Upcoming",filter_options={"All":lambda r:True,"This year":lambda r:r.year is not None,"No release year":lambda r:r.year is None}),
+            "Currently Airing":AnimeListPage("Currently Airing",self.repository,lambda r:r.tracker_status=="Currently Airing","Airing schedule times display locally; cached timestamps remain UTC.",{
+                "All":lambda r:True,"Missing aired episodes":lambda r:r.server_status=="PARTIAL","Complete so far":lambda r:r.coverage in {"CURRENT_COMPLETE","COMPLETE"},"Airing this week":lambda r:bool(r.next_airing_at),"No schedule":lambda r:not r.next_airing_at,"Refresh failed":lambda r:not r.last_updated,"On server":lambda r:r.server_status=="COMPLETE","Not on server":lambda r:r.server_status in {"NOT_ON_SERVER","NOT_FOUND"},
+            }),
+            "Finished / Ready to Add":AnimeListPage("Finished / Ready to Add",self.repository,lambda r:r.tracker_status=="Finished / Ready to Add" and r.server_status!="COMPLETE",filter_options={
+                "All":lambda r:True,"Partial":lambda r:r.server_status=="PARTIAL","Not found":lambda r:r.server_status in {"NOT_ON_SERVER","NOT_FOUND"},"Unknown coverage":lambda r:r.coverage=="UNKNOWN","Needs mapping":lambda r:r.mapping_label=="No confirmed server mapping",
+            }),
             "Movies":MoviesPage(self.repository),
-            "On Server":AnimeListPage("On Server",self.repository,lambda r:r.server_status=="COMPLETE","AniList status remains visible independently from complete server coverage."),
+            "On Server":AnimeListPage("On Server",self.repository,lambda r:r.server_status=="COMPLETE","AniList status remains visible independently from complete server coverage.",{
+                "All":lambda r:True,"Currently airing":lambda r:r.anilist_status=="RELEASING","Finished":lambda r:r.anilist_status=="FINISHED","Movie":lambda r:r.media_format=="MOVIE","Series":lambda r:r.media_format=="TV","Unknown coverage warning":lambda r:r.coverage=="UNKNOWN",
+            }),
             "Needs Review":ReviewPage(self.repository),
             "Franchises":FranchisePage(self.repository),
             "Jellyfin Coverage":CoveragePage(self.repository),
@@ -146,7 +152,7 @@ class MainWindow(QMainWindow):
     def open_add(self):
         provider=_production_search_provider(self.profile) if self.production else None
         AddAnimeDialog(search_provider=provider,parent=self,background_search=self.production).exec()
-    def open_detail(self,row):AnimeDetailDialog(row,self).exec()
+    def open_detail(self,row):AnimeDetailDialog(row,self,details=self.repository.media_details(row.anilist_id)).exec()
     def open_review(self,review):MatchingReviewDialog(review,self).exec()
     def open_preview(self):LegacyImportPreviewDialog(self.repository,self).exec()
     def run_scheduled_now(self):self._start_worker("Production scheduled check",_production_scheduled_check,self.profile)
@@ -166,6 +172,7 @@ class MainWindow(QMainWindow):
         self.thread_pool.waitForDone(1500); self.settings["window_geometry"]=bytes(self.saveGeometry().toBase64()).decode("ascii")
         settings_page=self.pages["Settings"]; self.settings["test_tv_path"]=settings_page.tv.text(); self.settings["test_movie_path"]=settings_page.movies.text()
         self.settings.update({"scheduled_checks_enabled":settings_page.schedule_enabled.isChecked(),"schedule_frequency":settings_page.schedule_frequency.currentText(),"schedule_day":settings_page.schedule_day.currentText(),"schedule_time":settings_page.schedule_time.text(),"run_when_missed":settings_page.run_missed.isChecked(),"anilist_refresh_enabled":settings_page.schedule_anilist.isChecked(),"jellyfin_scan_enabled":settings_page.schedule_jellyfin.isChecked(),"private_notifications_enabled":settings_page.schedule_private.isChecked(),"shared_notifications_enabled":settings_page.schedule_shared.isChecked(),"weekly_summaries_enabled":settings_page.schedule_summary.isChecked()})
+        self.settings.update({"notifications_private_enabled":settings_page.private_notifications.isChecked(),"notifications_shared_enabled":settings_page.shared_notifications.isChecked(),"notifications_windows_enabled":settings_page.windows_notifications.isChecked()})
         widths={}
         for name,page in self.pages.items():
             if isinstance(page,AnimeListPage):widths[name]=[page.table.view.columnWidth(index) for index in range(page.table.model.columnCount())]
@@ -225,7 +232,7 @@ def _production_search_provider(profile):
         from ..domain.enums import MediaKind
         media_format=MediaKind(format_value) if format_value else None
         values=service.search_media(query,year=year,media_format=media_format,page=page)
-        return tuple({"anilist_id":item.anilist_id,"title":item.title.english or item.title.romaji or item.title.primary,"alternate_title":" / ".join(value for value in (item.title.romaji,item.title.native) if value),"format":item.media_format.value,"year":item.season_year,"status":item.status.value,"episodes":item.episode_count,"cover_url":item.cover_images.medium,"related":tuple({"anilist_id":relation.target_anilist_id,"title":relation.target_title,"format":relation.target_format.value,"year":"","relation":relation.relation_type.value} for relation in item.relations if relation.target_anilist_id)} for item in values)
+        return tuple({"anilist_id":item.anilist_id,"title":resolve_display_title(TitleMetadata(item.anilist_id,item.title.english,item.title.romaji,item.title.native,item.title.primary)),"alternate_title":" / ".join(value for value in (item.title.romaji,item.title.native) if value),"format":item.media_format.value,"year":item.season_year,"status":item.status.value,"episodes":item.episode_count,"cover_url":item.cover_images.medium,"related":tuple({"anilist_id":relation.target_anilist_id,"title":relation.target_title or f"AniList {relation.target_anilist_id}","format":relation.target_format.value,"year":"","relation":relation.relation_type.value} for relation in item.relations if relation.target_anilist_id)} for item in values)
     return provider
 
 

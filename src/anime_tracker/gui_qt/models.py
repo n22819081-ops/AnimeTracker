@@ -31,7 +31,7 @@ class AnimeTableModel(QAbstractTableModel):
         value = getattr(row, COLUMNS[index.column()][1])
         if role in {Qt.DisplayRole, Qt.ToolTipRole}:
             if index.column() == 0:
-                return "Cover" if value else "No cover"
+                return "" if role == Qt.DisplayRole else ("Cover artwork" if value else "Cover artwork unavailable")
             return "" if value is None else str(value).replace("_", " ").title() if index.column() in {2,5,6,7,10} else str(value)
         if role == Qt.UserRole:
             return row

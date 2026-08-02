@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from PySide6.QtCore import Qt, QThreadPool
 from PySide6.QtWidgets import (
@@ -9,7 +10,8 @@ from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget,
 )
 
-from .data import AnimeRow, ModernRepository
+from .covers import CoverImageCache
+from .data import AnimeRow, ModernRepository, TitleMetadata, resolve_display_title
 from .widgets import CoverageBar, StatusBadge
 from .workers import BackgroundWorker
 
@@ -79,14 +81,17 @@ class AddAnimeDialog(QDialog):
 
 
 class AnimeDetailDialog(QDialog):
-    def __init__(self,row:AnimeRow,parent=None):
-        super().__init__(parent); self.row=row; self.setWindowTitle(row.title); self.resize(760,660)
-        layout=QVBoxLayout(self); top=QHBoxLayout(); cover=QLabel("Cover\nplaceholder"); cover.setFixedSize(150,210); cover.setAlignment(Qt.AlignCenter); cover.setObjectName("panel")
-        info=QFormLayout(); info.addRow("Primary title",QLabel(row.title)); info.addRow("Romaji",QLabel(row.romaji or "Unknown")); info.addRow("Native",QLabel(row.native or "Unknown")); info.addRow("AniList ID",QLabel(str(row.anilist_id))); info.addRow("Format",QLabel(row.media_format)); info.addRow("Season / Year",QLabel(f"{row.season or 'Unknown'} · {row.year or 'Unknown'}")); top.addWidget(cover); top.addLayout(info,1); layout.addLayout(top)
+    def __init__(self,row:AnimeRow,parent=None,*,details=None):
+        super().__init__(parent); self.row=row;self.details=details or {}; self.setWindowTitle(row.title); self.resize(760,660)
+        layout=QVBoxLayout(self); top=QHBoxLayout(); self.cover=QLabel(); self.cover.setFixedSize(150,210); self.cover.setAlignment(Qt.AlignCenter); self.cover.setObjectName("panel")
+        cache_dir=getattr(getattr(parent,"repository",None),"cover_cache_dir",Path.cwd()/"cache"/"covers")
+        self.cover_cache=CoverImageCache(cache_dir,self);self.cover.setPixmap(self.cover_cache.request(row.cover_url).scaled(150,210,Qt.KeepAspectRatio,Qt.SmoothTransformation));self.cover_cache.loaded.connect(self._cover_loaded)
+        info=QFormLayout(); info.addRow("Primary title",QLabel(row.title));info.addRow("English",QLabel(row.english or "Not provided by AniList")); info.addRow("Romaji",QLabel(row.romaji or "Not provided by AniList")); info.addRow("Native",QLabel(row.native or "Not provided by AniList"));info.addRow("Synonyms",QLabel(", ".join(row.synonyms) or "None provided")); info.addRow("AniList ID",QLabel(str(row.anilist_id))); info.addRow("Format",QLabel(row.media_format)); info.addRow("Season / Year",QLabel(f"{row.season or 'Not provided'} · {row.year or 'Not provided'}"));info.addRow("Episodes",QLabel(str(row.episode_count) if row.episode_count is not None else "Not provided")); top.addWidget(self.cover); top.addLayout(info,1); layout.addLayout(top)
         statuses=QHBoxLayout(); statuses.addWidget(StatusBadge(f"AniList: {row.anilist_status}")); statuses.addWidget(StatusBadge(f"Tracker: {row.tracker_status}")); statuses.addWidget(StatusBadge(f"Server: {row.server_status}")); layout.addLayout(statuses)
         tabs=QTabWidget();
-        overview=QWidget(); form=QFormLayout(overview); form.addRow("Coverage",QLabel(row.coverage)); form.addRow("Next episode",QLabel(row.next_episode or "No schedule")); form.addRow("Current mapping",QLabel(row.mapping_label)); form.addRow("Decision explanation",QLabel("Provider, tracker, server, coverage, and review states are evaluated independently.")); tabs.addTab(overview,"Overview")
-        for name,text in (("Relations",row.relation_label or "No cached relations"),("Mapping History","History is preserved in the modern repository."),("Rejections","No active rejection details loaded."),("Review Cases",row.review or "No open review"),("Notifications","Per-title private/shared suppressions remain separate.")):
+        overview=QWidget(); form=QFormLayout(overview); form.addRow("Coverage",QLabel(row.coverage)); form.addRow("Next episode",QLabel(row.next_episode or "No schedule"));form.addRow("Airing time",QLabel(row.next_airing_at or "No schedule")); form.addRow("Current mapping",QLabel(row.mapping_label));form.addRow("Review reason",QLabel(row.review_reason or "No review required")); form.addRow("Decision explanation",QLabel("Provider, tracker, server, coverage, and review states are evaluated independently.")); tabs.addTab(overview,"Overview")
+        history=(*self.details.get("history",()),*self.details.get("mapping_history",()))
+        for name,text in (("Relations",row.relation_label or "No cached relations"),("Mapping History",_detail_lines(history,"No mapping or tracker history")),("Rejections",_detail_lines(self.details.get("rejections",()),"No rejected matches")),("Review Cases",_detail_lines(self.details.get("reviews",()),row.review_reason or row.review or "No open review")),("Notifications",_detail_lines(self.details.get("notification_preferences",()),"No per-title suppression; channel preferences remain independent"))):
             widget=QTextEdit(text); widget.setReadOnly(True); tabs.addTab(widget,name)
         layout.addWidget(tabs,1)
         actions=QGridLayout()
@@ -95,16 +100,21 @@ class AnimeDetailDialog(QDialog):
             button=QPushButton(label); button.setEnabled(label in {"Copy Title","View Franchise","Review Server Match"}); actions.addWidget(button,index//4,index%4)
         layout.addLayout(actions); close=QDialogButtonBox(QDialogButtonBox.Close); close.rejected.connect(self.reject); layout.addWidget(close)
 
+    def _cover_loaded(self,url,pixmap):
+        if url==self.row.cover_url:self.cover.setPixmap(pixmap.scaled(150,210,Qt.KeepAspectRatio,Qt.SmoothTransformation))
+
 
 class MatchingReviewDialog(QDialog):
     def __init__(self,review:dict,parent=None):
         super().__init__(parent); self.review=review; self.setWindowTitle("Review Server Match"); self.resize(780,600)
-        layout=QVBoxLayout(self); layout.addWidget(QLabel(f"AniList Entry: {review.get('title') or 'Tracked anime'}"))
-        explanation=QLabel(str(review.get("evidence_json") or review.get("evidence") or "Review the candidate evidence below before making a decision.")); explanation.setWordWrap(True); layout.addWidget(explanation)
-        self.candidates=QTableWidget(0,4); self.candidates.setHorizontalHeaderLabels(["Target","Confidence","Score","Evidence"]); layout.addWidget(self.candidates,1)
+        layout=QVBoxLayout(self); layout.addWidget(QLabel(f"{review.get('title') or 'Tracked anime'}\nAniList {review.get('anilist_id','')} · {review.get('media_format','Unknown')} · {review.get('season_name') or ''} {review.get('season_year') or ''}"))
+        explanation=QLabel(f"Why this item needs review: {review.get('reason') or review.get('review_type','Decision required').replace('_',' ').title()}"); explanation.setWordWrap(True); layout.addWidget(explanation)
+        mapping=QLabel(f"Current mapping: {review.get('current_mapping') or 'No confirmed server mapping'}");mapping.setWordWrap(True);layout.addWidget(mapping)
+        self.candidates=QTableWidget(0,5); self.candidates.setHorizontalHeaderLabels(["Suggested target","Confidence","Score","Evidence","Exact Jellyfin path"]); layout.addWidget(self.candidates,1)
         for candidate in review.get("candidates",()):
             pos=self.candidates.rowCount(); self.candidates.insertRow(pos)
-            for col,key in enumerate(("target","confidence","score","evidence")):self.candidates.setItem(pos,col,QTableWidgetItem(str(candidate.get(key,""))))
+            values=(candidate.get("display_name") or candidate.get("target") or candidate.get("relative_path") or "Unnamed target",candidate.get("confidence") or "",candidate.get("score") or "",candidate.get("evidence_json") or candidate.get("evidence") or "",candidate.get("relative_path") or "")
+            for col,value in enumerate(values):self.candidates.setItem(pos,col,QTableWidgetItem(str(value)))
         self.stale=bool(review.get("stale")); self.notice=QLabel("Candidate is stale and must be regenerated." if self.stale else "Manual confirmation is required. Suggestions are never auto-confirmed."); self.notice.setObjectName("profileBanner" if self.stale else "muted"); layout.addWidget(self.notice)
         buttons=QDialogButtonBox(); self.confirm=buttons.addButton("Confirm Suggestion",QDialogButtonBox.AcceptRole); self.confirm.setEnabled(not self.stale and self.candidates.rowCount()>0); buttons.addButton("Choose Different Target",QDialogButtonBox.ActionRole); buttons.addButton("Reject Candidate",QDialogButtonBox.DestructiveRole); buttons.addButton("Mark Not on Server",QDialogButtonBox.ActionRole); buttons.addButton("Suppress Auto-Match",QDialogButtonBox.ActionRole); buttons.addButton(QDialogButtonBox.Cancel); buttons.accepted.connect(self.accept); buttons.rejected.connect(self.reject); layout.addWidget(buttons)
 
@@ -126,3 +136,8 @@ def _search_operation(provider,text,year,format_value,page,*,cancel_event,progre
     try:results=tuple(provider(text,year,format_value,page=page))
     except TypeError:results=tuple(provider(text,year,format_value))
     progress(1,1,f"Found {len(results)} matches");return results
+
+
+def _detail_lines(values,empty):
+    if not values:return empty
+    return "\n\n".join(" · ".join(f"{key.replace('_',' ').title()}: {value}" for key,value in item.items() if value not in (None,"",[],{})) for item in values)

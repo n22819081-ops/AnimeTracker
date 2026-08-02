@@ -32,3 +32,17 @@ Final result: 633 passed, 0 failed, 0 skipped, and 47 subtests passed in 35.40 s
 - Cutover: pending explicit approval
 
 The legacy task remains Ready. No production Discord send, Task Scheduler change, media modification, Storage Checker invocation, package, installer, or Milestone 9 work occurred.
+
+## Acceptance-Fix Addendum
+
+User acceptance exposed a case mismatch between lowercase `media_titles.title_type` values and uppercase GUI repository predicates. The correction is documented in `MILESTONE_8_ACCEPTANCE_FIXES.md` and `PRODUCTION_METADATA_BINDING.md`.
+
+- Required pre-fix production database SHA-256: `2636A1088980CF4C939660401BF3A7FB0EB61E15060227293204CAA7777ED148`
+- Verified backup: `production_profile/backups/20260802-072013-pre-m8-acceptance-fix`
+- Backup database SHA-256: `7534430EB5AD6B391807F5D2C56844DFF38636C38F72A62CE22D926D4F3AD825`
+- Post-backup-audit database SHA-256: `686BE777398D98800DB468ABB7BFA4553323850292A8F69794A8256341A9A181`
+- Integrity and active/archived/baseline counts remained `ok` and 69/421/1,312.
+- Actual-profile smoke: 69/69 titles, 8/8 reviews, 69/69 franchise rows, and 69/69 coverage rows named.
+- Full acceptance suite: 643 passed, 0 failed, and 47 subtests passed in 32.67 seconds.
+
+The actual-profile smoke was read-only and did not save settings. Checkbox persistence was validated against a verified production-profile copy. No notification was delivered.

@@ -18,3 +18,5 @@ The modern application exposes these pages:
 The sidebar, keyboard row navigation, `Ctrl+K` search focus, sortable tables, context menu, double-click details, horizontal scrolling, and column visibility support repeated desktop use. The selected page, window geometry, theme, test paths, and table widths persist in the modern profile.
 
 The top toolbar exposes search, cached refresh, explicit test-root scanning, and Add Anime. Startup does not contact AniList or scan a server. The bottom bar shows task progress, last refresh, last scan, and notification test-mode state.
+
+Search now applies to status tables, Needs Review, Franchises, Jellyfin Coverage, Notifications, and History. Status pages expose only contextual views: airing schedule/coverage/server filters for Currently Airing; partial/not-found/mapping filters for Ready to Add; and airing/finished/format/coverage filters for On Server.

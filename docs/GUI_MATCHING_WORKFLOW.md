@@ -7,3 +7,5 @@ Suggestions require a user decision. Stale candidates disable confirmation until
 Franchise grouping and Jellyfin mapping stay separate. The franchise tree shows each AniList identity with relation context, format/year, tracker status, mapping scope, and coverage. Season numbering is displayed only from stored mapping scope, never inferred solely from graph order.
 
 Add Anime accepts title, ID, or URL input, optional year/format filters, paging, exact-result selection, and opt-in related entries. It never selects every relation or maps to Jellyfin automatically. Live AniList insertion is not enabled in this milestone; the dialog boundary is ready for the later operations integration.
+
+Review records are joined to canonical metadata before presentation. Each item shows title, AniList ID, format, season/year, review type, severity, explanation, current mapping, and attached candidate evidence. Relation targets in the franchise tree use the centralized title resolver and retain provider direction; season scope comes only from stored mapping data.
