@@ -1,0 +1,7 @@
+{
+  "upcoming": [{"id": 5004, "mediaId": 1002, "episode": 4, "airingAt": 1786233600, "timeUntilAiring": 86400}],
+  "recent": [{"id": 5003, "mediaId": 1002, "episode": 3, "airingAt": 1785628800, "timeUntilAiring": -518400}],
+  "changed_time_previous": [{"id": 5004, "mediaId": 1002, "episode": 4, "airingAt": 1786233600, "timeUntilAiring": 86400}],
+  "changed_time_current": [{"id": 5004, "mediaId": 1002, "episode": 4, "airingAt": 1786320000, "timeUntilAiring": 172800}],
+  "final_episode": [{"id": 5012, "mediaId": 1002, "episode": 12, "airingAt": 1785542300, "timeUntilAiring": -100}]
+}

@@ -4,6 +4,8 @@ The prototype used only the verified backup. It did not replace or migrate the l
 
 Milestone 2 revalidated all 69 active rows through the row-only domain compatibility adapter and represented all 421 archived orphan records without reassignment or loss. It did not change the prototype schema or either database.
 
+Milestone 3 copied the unchanged v1 prototype to ignored `anime_tracker_modern_v3.db`, recorded the no-op v2 marker, and applied the AniList-service v3 schema transactionally. The copy retains 69 tracked records, 1 mapping, 11 rejections, 14 candidates, 153 history records, and all 421 archives with integrity `ok` and zero foreign-key violations. Neither the v1 prototype nor live database was altered.
+
 ## Source Reconciliation
 
 | Legacy table | Source | Active | Archived | Excluded | Warnings | Balanced |

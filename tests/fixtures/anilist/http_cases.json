@@ -1,0 +1,7 @@
+{
+  "rate_limited": {"status": 429, "headers": {"Retry-After": "2", "X-RateLimit-Limit": "90", "X-RateLimit-Remaining": "0"}, "body": {"errors": [{"message": "Too Many Requests"}]}},
+  "rate_limited_zero": {"status": 429, "headers": {"Retry-After": "0"}, "body": {"errors": [{"message": "Too Many Requests"}]}},
+  "graphql_error": {"status": 200, "headers": {}, "body": {"errors": [{"message": "Variable id has an invalid value"}]}},
+  "not_found": {"status": 200, "headers": {}, "body": {"errors": [{"message": "Media not found"}]}},
+  "malformed": {"status": 200, "headers": {}, "body": ["not", "an", "object"]}
+}

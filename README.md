@@ -4,7 +4,7 @@ Anime Tracker is a local Windows desktop app for tracking anime you want to add 
 
 ## Modernization Status
 
-Modernization Milestones 1 and 2 establish verified backups, reconciled copy-only migration data, typed core domain models, deterministic status and episode-coverage rules, mapping/review/override semantics, archival behavior, and typed transition events. The new domain package is not yet wired into the Tkinter application and does not replace the live database.
+Modernization Milestones 1 through 3 establish verified backups, reconciled copy-only migration data, typed domain/status rules, and a modern cache-aware AniList service with structured batches, airing events, and franchise graphs. The modern packages are not yet wired into the Tkinter application and do not replace the live database or legacy AniList client.
 
 Milestone documentation is under `docs/`. The disposable prototype is created under ignored `migration_test/`, and the immutable checkpoint is under ignored `modernization_backups/`.
 
@@ -115,6 +115,7 @@ If `pytest` is unavailable:
 - `src/anime_tracker/database.py`: SQLite schema and persistence.
 - `src/anime_tracker/status.py`: tracker status transition rules.
 - `src/anime_tracker/domain/`: persistence-neutral modern domain models and deterministic rules (not yet a production cutover).
+- `src/anime_tracker/services/anilist/`: typed modern AniList client, cache, batches, schedules, and franchise graph (not yet wired into production).
 - `src/anime_tracker/scanner.py`: read-only Jellyfin matching.
 - `src/anime_tracker/config.py`: local notification config storage.
 - `src/anime_tracker/notifications.py`: Discord embeds and optional Windows toast notifications.

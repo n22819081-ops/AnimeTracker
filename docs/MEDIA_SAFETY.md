@@ -15,4 +15,6 @@ All future scan sessions must be marked read-only. Database, log, export, cache,
 
 The Milestone 2 domain package has no filesystem APIs, media-root strings, scanner imports, subprocess calls, or write operations. Its automated safety tests statically enforce the absence of GUI, network, SQLite, scanner, notification, and scheduler dependencies.
 
+The Milestone 3 AniList service writes only explicitly configured schema-v3 cache databases. It contains no Jellyfin scanner, media-root, Discord, GUI, subprocess, or Task Scheduler dependency. Automated requests use injected fake sessions. AniList request variables contain only provider search/ID/filter/schedule values, never local media data.
+
 Optional Jellyfin API support may be added later only for read-only queries. Filesystem scanning remains available without an API key.

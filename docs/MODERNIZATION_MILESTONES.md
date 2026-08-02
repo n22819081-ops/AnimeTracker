@@ -22,6 +22,8 @@ Status: implemented and regression-validated. The package is persistence-neutral
 
 Add cache TTLs, batched refreshes, rate-limit-aware retries, airing schedules, relation IDs, and a persistent franchise graph.
 
+Status: implemented and regression-validated beside the unchanged legacy client. The modern service is not wired into production UI or scheduling. Schema v3 exists only on an ignored migration-test copy.
+
 ## Milestone 4: Read-Only Server Inventory
 
 Build incremental filesystem snapshots and optional read-only Jellyfin API discovery for shows, seasons, episodes, movies, and specials.
@@ -46,4 +48,4 @@ Integrate scheduling, verified backup/restore, credential migration, diagnostics
 
 Package a Windows application, validate on a clean user profile, test upgrade/rollback, and publish a versioned release.
 
-Milestone 3 and later are not part of the current implementation.
+Milestone 4 and later are not part of the current implementation.

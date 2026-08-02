@@ -4,6 +4,8 @@
 
 Schema version 1 is a migration-validation schema only. The legacy application does not read or write it. The prototype is created under `migration_test`, and production cutover is deferred until Milestone 8. Milestone 2 adds persistence-neutral typed domain objects and does not alter this prototype, so schema version 2 is not needed yet.
 
+Milestone 3 records version 2 as the intentional no-persistence-change domain marker, then transactionally applies schema version 3 to a separate `anime_tracker_modern_v3.db` copy. Version 3 adds `anilist_media_cache`, title variants, provider relations and relation state, airing schedules and schedule state, refresh items/batch accounting, request-rate state, franchise graph nodes/edges, and group suggestions. Existing version-1 rows remain unchanged.
+
 ## Product Invariants
 
 - AniList identity, tracker workflow, server presence, episode coverage, and review state are independent concepts.

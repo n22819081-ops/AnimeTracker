@@ -15,6 +15,10 @@
 
 `anime_tracker.domain.legacy_adapter` converts row-like values into typed domain inputs without querying SQLite. Legacy `On Server` preserves its manual confirmation through an explicit legacy override while coverage remains `UNKNOWN_COVERAGE`. Legacy `Not Found` becomes `NOT_FOUND` with no review. Legacy `Needs Review` becomes `LEGACY_DATA_REVIEW` when the precise cause is unavailable, and `Missing - Needs Review` becomes `PATH_MISSING` plus `MISSING_CONFIRMED_PATH`. The adapter never invents episode inventory or relation edges.
 
+## Milestone 3 AniList Adapter
+
+`anime_tracker.services.anilist.legacy_adapter` converts typed provider metadata into the legacy comparison shape without writing it. Generic `relation_label` values become unresolved audit edges with no target ID. Provider-confirmed relation IDs can coexist with that evidence later; the adapter never fabricates ownership or a relation target.
+
 ## `anime`
 
 | Source column | Meaning | Destination | Transformation / null behavior | Conflict / orphan behavior | Validation |
