@@ -1,0 +1,195 @@
+{
+  "audit_scope": "Milestone 8 production database hash change",
+  "audit_mode": "read-only",
+  "conclusion": {
+    "root_cause": "The verified backup routine intentionally inserted one operational record into backup_audit after completing and verifying its online SQLite snapshot.",
+    "business_data_changed": false,
+    "unexpected_data_changed": false,
+    "restore_required": false,
+    "current_database_safe_to_continue": true,
+    "milestone_9_started": false
+  },
+  "artifacts": {
+    "observed_live_pre_audit_sha256": "2636A1088980CF4C939660401BF3A7FB0EB61E15060227293204CAA7777ED148",
+    "verified_pre_audit_snapshot_sha256": "7534430EB5AD6B391807F5D2C56844DFF38636C38F72A62CE22D926D4F3AD825",
+    "current_post_audit_sha256": "686BE777398D98800DB468ABB7BFA4553323850292A8F69794A8256341A9A181",
+    "snapshot_manifest_verified": true,
+    "snapshot_integrity_recorded": "ok",
+    "snapshot_size_bytes": 8851456,
+    "current_size_bytes": 8851456,
+    "exact_pre_audit_live_file_retained": false,
+    "pre_audit_logical_state_available": true
+  },
+  "normalized_logical_exports": {
+    "algorithm": "For each table: preserve declared column order, encode BLOBs as SHA-256 plus length, sort canonical JSON rows, hash the canonical table payload, then hash the ordered table-digest manifest.",
+    "tables_compared": 74,
+    "schema_digest_pre": "086A7DDFB80AA1FB24924B07271F13A35FCEA488E7AAA56F9159B5726AC66ECB",
+    "schema_digest_post": "086A7DDFB80AA1FB24924B07271F13A35FCEA488E7AAA56F9159B5726AC66ECB",
+    "all_tables_digest_pre": "D8238058558121D3F64C156FA22EBE75D96D0BC4C8E41D510F2F1E5E20299E0B",
+    "all_tables_digest_post": "FD5D8453870F8C1A6F1391A0DF7FC49EED894D3B8D99E72013FAB0107C4A34C7",
+    "business_tables_digest_pre": "593E3D839F72B9B910927D478808B734DB75F72E9DDFDFA0EA13707C096DBE01",
+    "business_tables_digest_post": "593E3D839F72B9B910927D478808B734DB75F72E9DDFDFA0EA13707C096DBE01",
+    "changed_tables": [
+      "backup_audit"
+    ],
+    "unchanged_table_count": 73
+  },
+  "logical_changes": [
+    {
+      "classification": "expected operational metadata and backup history",
+      "table": "backup_audit",
+      "operation": "insert",
+      "rows_before": 4,
+      "rows_after": 5,
+      "row": {
+        "backup_id": "backup-10a91919638945ca819bf61245e5d502",
+        "reason": "PRE_M8_ACCEPTANCE_FIX",
+        "created_at": "2026-08-02T07:20:13.758006+00:00",
+        "path_reference": "20260802-072013-pre-m8-acceptance-fix",
+        "database_sha256": "7534430EB5AD6B391807F5D2C56844DFF38636C38F72A62CE22D926D4F3AD825",
+        "integrity_result": "ok",
+        "manifest_sha256": "A459EA1B81E77D94E6F9A4B8B7FFB4B706B23009D23D0B6BD33F60B09F7011FC"
+      },
+      "expected_reason": "ModernBackupManager.create records the completed verified backup in the live production database after the snapshot is finalized."
+    }
+  ],
+  "sqlite_structure": {
+    "schema_equal": true,
+    "tables_pre": 74,
+    "tables_post": 74,
+    "indexes_pre": 25,
+    "indexes_post": 25,
+    "indexes_equal": true,
+    "triggers_pre": 0,
+    "triggers_post": 0,
+    "views_pre": 0,
+    "views_post": 0,
+    "user_version_pre": 0,
+    "user_version_post": 0,
+    "page_size_pre": 4096,
+    "page_size_post": 4096,
+    "page_count_pre": 2161,
+    "page_count_post": 2161,
+    "freelist_count_pre": 5,
+    "freelist_count_post": 5,
+    "auto_vacuum_pre": 0,
+    "auto_vacuum_post": 0,
+    "encoding_pre": "UTF-8",
+    "encoding_post": "UTF-8",
+    "application_id_pre": 0,
+    "application_id_post": 0,
+    "cache_size_pre": -2000,
+    "cache_size_post": -2000,
+    "foreign_keys_connection_setting_pre": 0,
+    "foreign_keys_connection_setting_post": 0,
+    "locking_mode_pre": "normal",
+    "locking_mode_post": "normal",
+    "max_page_count_pre": 4294967294,
+    "max_page_count_post": 4294967294,
+    "schema_version_pre": 1,
+    "schema_version_post": 117,
+    "secure_delete_pre": 0,
+    "secure_delete_post": 0,
+    "synchronous_pre": 2,
+    "synchronous_post": 2,
+    "wal_autocheckpoint_pre": 1000,
+    "wal_autocheckpoint_post": 1000,
+    "journal_mode_pre": "delete",
+    "journal_mode_post": "delete",
+    "wal_pre_present": false,
+    "wal_post_present": false,
+    "journal_pre_present": false,
+    "journal_post_present": false,
+    "wal_checkpoint_contributed": false,
+    "vacuum_contributed": false,
+    "index_rebuild_contributed": false
+  },
+  "physical_layout": {
+    "backup_snapshot_schema_cookie": 1,
+    "current_schema_cookie": 117,
+    "backup_snapshot_file_change_counter": 1,
+    "current_file_change_counter": 431,
+    "explanation": "The online backup destination has normalized destination header counters and therefore is not byte-identical to the original live pre-audit file. Logical sqlite_master content is identical. The exact pre-audit live file was not retained, so its page-one header cannot be directly diffed.",
+    "snapshot_to_current_changed_pages": [
+      1,
+      539,
+      540
+    ],
+    "page_539_owner": "backup_audit table",
+    "page_540_owner": "sqlite_autoindex_backup_audit_1",
+    "page_1_owner": "SQLite database header and schema page"
+  },
+  "integrity": {
+    "integrity_check_pre": "ok",
+    "integrity_check_post": "ok",
+    "foreign_key_violations_pre": 0,
+    "foreign_key_violations_post": 0
+  },
+  "essential_counts": {
+    "active_titles_pre": 69,
+    "active_titles_post": 69,
+    "archived_orphaned_pre": 421,
+    "archived_orphaned_post": 421,
+    "shared_baselines_pre": 1312,
+    "shared_baselines_post": 1312,
+    "genuine_open_reviews_pre": 8,
+    "genuine_open_reviews_post": 8
+  },
+  "business_invariants": {
+    "media_server_mappings": {"pre": 1, "post": 1, "rows_equal": true},
+    "jellyfin_folder_mappings": {"pre": 1, "post": 1, "rows_equal": true},
+    "mapping_history": {"pre": 1, "post": 1, "rows_equal": true},
+    "rejected_match_decisions": {"pre": 11, "post": 11, "rows_equal": true},
+    "shared_announcement_baselines_v2": {"pre": 1312, "post": 1312, "rows_equal": true},
+    "notification_events_v2": {"pre": 0, "post": 0, "rows_equal": true},
+    "notification_outbox": {"pre": 0, "post": 0, "rows_equal": true},
+    "notification_delivery_attempts": {"pre": 0, "post": 0, "rows_equal": true},
+    "shared_announcement_deliveries": {"pre": 0, "post": 0, "rows_equal": true},
+    "credential_references": {"pre": 2, "post": 2, "rows_equal": true, "enabled": 0},
+    "media_titles": {"pre": 340, "post": 340, "rows_equal": true},
+    "anilist_media_cache": {"pre": 69, "post": 69, "rows_equal": true},
+    "cutover_audit": {"pre": 0, "post": 0, "rows_equal": true},
+    "cutover_state": "PENDING_APPROVAL",
+    "migration_state": "MIGRATED_PENDING_CUTOVER"
+  },
+  "gui_write_audit": {
+    "opening_gui_writes_database": false,
+    "health_check_writes_database": false,
+    "page_selection_writes_database": false,
+    "cover_cache_access_writes_database": false,
+    "diagnostic_health_read_writes_database": false,
+    "closing_gui_writes_profile_json": true,
+    "database_fields_not_present": [
+      "last-opened time",
+      "window geometry",
+      "last selected page",
+      "cache access time",
+      "health-check result"
+    ],
+    "post_backup_profile_json_changes": [
+      "settings.json added three false event-generation settings",
+      "settings.json persisted the Upcoming title-column width as 289 instead of 100",
+      "bootstrap.json was rewritten but retained byte-identical logical content"
+    ],
+    "profile_json_changes_contributed_to_database_hash": false,
+    "database_write_from_backup_process": "one backup_audit insert"
+  },
+  "external_observations_outside_modern_hash_comparison": {
+    "legacy_database_previous_sha256": "52D2F8D5E1365A655CDB915A6357822EEF21D8D226797A0EE791D03491D4B2A7",
+    "legacy_database_current_sha256": "69763FC9EC883096041C6EDEDD9399B4697EBC650A48D07BA87879C787B3782E",
+    "legacy_database_last_write_utc": "2026-08-02T14:03:04Z",
+    "cause": "The existing legacy scheduled task ran from 10:00:01 through 10:03:05 local time before this audit. Its log records a scheduled backup, refresh/status updates, and a scheduled Discord summary.",
+    "modern_database_affected": false,
+    "triggered_by_this_audit": false,
+    "task_scheduler_configuration_changed_by_this_audit": false
+  },
+  "safety": {
+    "jellyfin_media_modified_by_this_audit": false,
+    "discord_messages_sent_by_this_audit": false,
+    "task_scheduler_changed_by_this_audit": false,
+    "legacy_database_modified_by_this_audit": false,
+    "storage_checker_invoked_or_modified_by_this_audit": false,
+    "packaging_started_by_this_audit": false
+  },
+  "recommended_action": "Continue using the current modern production database. Retain the verified pre-audit backup and this audit. Do not restore because the sole logical change is the expected successful-backup audit record."
+}

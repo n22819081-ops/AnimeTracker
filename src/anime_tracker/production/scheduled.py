@@ -12,6 +12,7 @@ from .backup_restore import ModernBackupManager
 from .locks import FileOperationLock,OperationAlreadyRunning
 from .operations import ProductionAniListOperations,ProductionInventoryOperations
 from .profile import ProductionProfile
+from ..runtime import APP_VERSION
 
 
 class ScheduledRunStatus(str,Enum):
@@ -20,7 +21,7 @@ class ScheduledRunStatus(str,Enum):
 
 @dataclass
 class ScheduledRunResult:
-    run_id:str;started_at:str;completed_at:str;status:str;refresh_success:int=0;refresh_failed:int=0;cache_hits:int=0;inventory_result:str="DISABLED";mapping_result:str="DISABLED";events_created:int=0;delivered:int=0;retry_count:int=0;permanent_failures:int=0;warnings:tuple[str,...]=()
+    run_id:str;started_at:str;completed_at:str;status:str;refresh_success:int=0;refresh_failed:int=0;cache_hits:int=0;inventory_result:str="DISABLED";mapping_result:str="DISABLED";events_created:int=0;delivered:int=0;retry_count:int=0;permanent_failures:int=0;warnings:tuple[str,...]=();application_version:str=APP_VERSION
 
 
 class ScheduledCheckRunner:
@@ -28,7 +29,7 @@ class ScheduledCheckRunner:
         self.profile=profile;self.anilist=anilist or ProductionAniListOperations(profile);self.inventory=inventory or ProductionInventoryOperations(profile);self.backup=backup or ModernBackupManager(profile);self.deliver=deliver
 
     def run(self)->ScheduledRunResult:
-        started=datetime.now(timezone.utc);run_id=f"scheduled-{uuid.uuid4().hex}"
+        started=datetime.now(timezone.utc);run_id=f"scheduled-v{APP_VERSION}-{uuid.uuid4().hex}"
         if not self.profile.database_path.is_file():
             result=ScheduledRunResult(run_id,started.isoformat(),datetime.now(timezone.utc).isoformat(),ScheduledRunStatus.FAILED.value,warnings=("The modern production database is not migrated.",));self._write_log(result);return result
         try:

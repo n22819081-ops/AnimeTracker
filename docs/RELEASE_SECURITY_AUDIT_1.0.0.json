@@ -1,0 +1,9 @@
+{
+  "product": "Anime Tracker",
+  "version": "1.0.0",
+  "result": "PASS_WITH_EXECUTION_VALIDATION_BLOCKED",
+  "passed": ["no shell=True", "no eval", "no arbitrary templates", "no external Python runtime", "absolute PowerShell path", "argument-array UAC construction", "no secret logging or SQLite secret values", "Stage 1 default", "no automatic task install", "no legacy-task disable", "no profile deletion", "read-only media scanner", "Storage Checker isolation", "per-user installer"],
+  "blocked": ["Direct launch of unsigned generated EXE", "Installer lifecycle execution", "Packaged path relocation execution"],
+  "defender": "No threats found in distribution, installer, or ZIP",
+  "code_signing": "UNSIGNED"
+}

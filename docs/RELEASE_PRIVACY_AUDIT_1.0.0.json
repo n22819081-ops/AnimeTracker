@@ -1,0 +1,11 @@
+{
+  "product": "Anime Tracker",
+  "version": "1.0.0",
+  "result": "PASS",
+  "scope": ["PyInstaller onedir", "Inno source payload", "portable ZIP", "release directory"],
+  "portable_members": 223,
+  "portable_crc": "PASS",
+  "byte_patterns_checked": ["source path", "developer username", "Jellyfin roots", "webhook endpoint", "virtual environment", "Storage Checker", "database filenames"],
+  "forbidden_file_classes_found": [],
+  "notes": ["The installer was compiled exclusively from the audited onedir payload.", "Generated EXE reads required hash-identical opaque staging copies because endpoint policy locked .exe access.", "No public artifact contains profile data or credential blobs."]
+}

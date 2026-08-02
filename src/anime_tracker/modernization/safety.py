@@ -1,13 +1,12 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 
-DEFAULT_PROTECTED_ROOTS = (
-    Path(r"I:\Jellyfin_Media\TV-SHOWs"),
-    Path(r"I:\Jellyfin_Media\Movies"),
-    Path(r"I:\Jellyfin_Media\Anime"),
-)
+_MEDIA_DRIVE=os.environ.get("ANIME_TRACKER_MEDIA_DRIVE","I:").rstrip("\\/")
+_MEDIA_ROOT=Path(_MEDIA_DRIVE+"\\")/"Jellyfin_Media"
+DEFAULT_PROTECTED_ROOTS=(_MEDIA_ROOT/"TV-SHOWs",_MEDIA_ROOT/"Movies",_MEDIA_ROOT/"Anime")
 
 
 def is_within(path: Path, parent: Path) -> bool:

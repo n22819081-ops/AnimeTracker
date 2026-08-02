@@ -12,6 +12,7 @@ from pathlib import Path
 from ..modernization.backup import BackupPoint, build_manifest, plan_backup_retention, sha256_file, sqlite_integrity_check, sqlite_online_backup, verify_manifest
 from .locks import FileOperationLock
 from .profile import LIVE_LEGACY_DATABASE, ProductionProfile
+from ..runtime import APP_VERSION
 
 
 PROTECTED_REASONS={"PRE_MIGRATION","PRE_PRODUCTION_CUTOVER"}
@@ -22,7 +23,7 @@ class RestoreError(RuntimeError):pass
 
 
 class ModernBackupManager:
-    def __init__(self,profile:ProductionProfile,*,version:str="0.8.0")->None:self.profile=profile;self.version=version
+    def __init__(self,profile:ProductionProfile,*,version:str=APP_VERSION)->None:self.profile=profile;self.version=version
 
     def create(self,reason:str)->Path:
         if not self.profile.database_path.is_file():raise BackupError("The modern production database is unavailable.")

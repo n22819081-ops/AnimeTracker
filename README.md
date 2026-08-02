@@ -1,4 +1,10 @@
-# Anime Tracker
+# Anime Tracker 1.0.0 Release Candidate
+
+Anime Tracker is a local Windows desktop application for tracking AniList anime and comparing them with Jellyfin libraries. Jellyfin access is read-only: the application never renames, moves, replaces, deletes, or writes media files.
+
+The normal release entry point is `Anime Tracker.exe`. Mutable data is stored per user under `%LOCALAPPDATA%\Anime Tracker\AnimeTracker`, outside the installed or portable application directory. Discord delivery and scheduling are disabled until explicitly configured.
+
+See [Installation](docs/INSTALLATION.md), [First Run](docs/FIRST_RUN_GUIDE.md), [Quick Start](docs/QUICK_START.md), and [Release Notes](docs/RELEASE_NOTES_1.0.0.md). Development launchers remain for source work but are not needed by the packaged release.
 
 Anime Tracker is a local Windows desktop app for tracking anime you want to add to a Jellyfin server. It uses AniList public GraphQL queries for metadata and stores local tracking state in SQLite.
 

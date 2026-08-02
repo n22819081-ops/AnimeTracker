@@ -4,9 +4,11 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..runtime import APP_VERSION, default_profile_root, validate_profile_override
+
 
 ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_PRODUCTION_PROFILE = ROOT / "production_profile"
+DEFAULT_PRODUCTION_PROFILE = default_profile_root()
 LIVE_LEGACY_DATABASE = ROOT / "data" / "anime_tracker.db"
 
 
@@ -27,7 +29,7 @@ def default_bootstrap() -> dict:
         "initial_baseline_accepted": False,
         "notification_baseline_state": "MIGRATED_PREVIEW_PENDING",
         "initial_events_created": 0,
-        "migration_version": "0.8.0",
+        "migration_version": APP_VERSION,
     }
 
 
@@ -66,6 +68,28 @@ class ProductionProfile:
             path.mkdir(parents=True, exist_ok=True)
         if not self.bootstrap_path.exists(): self.save_bootstrap(default_bootstrap())
         if not self.settings_path.exists(): self.save_settings({"theme": "Dark", "test_tv_path": "", "test_movie_path": ""})
+
+    def initialize_new(self) -> None:
+        """Create a clean schema-v6 profile without legacy or production data."""
+        self.initialize_directories()
+        if self.database_path.exists():
+            raise FileExistsError(f"Profile database already exists: {self.database_path}")
+        from ..modernization.schema import create_modern_database
+        from ..modernization.schema_v3 import migrate_modern_database_to_v3
+        from ..modernization.schema_v4 import migrate_modern_database_to_v4
+        from ..modernization.schema_v5 import migrate_modern_database_to_v5
+        from .schema import migrate_to_production_schema
+        create_modern_database(self.database_path,protected_roots=())
+        migrate_modern_database_to_v3(self.database_path,protected_roots=())
+        migrate_modern_database_to_v4(self.database_path,protected_roots=())
+        migrate_modern_database_to_v5(self.database_path,protected_roots=())
+        migrate_to_production_schema(self.database_path)
+        bootstrap=default_bootstrap();bootstrap.update({"migration_state":"FRESH_PROFILE","cutover_state":"NOT_APPLICABLE","credential_migration_state":"NOT_CONFIGURED","notification_baseline_state":"EMPTY","migration_version":APP_VERSION})
+        self.save_bootstrap(bootstrap)
+
+    @classmethod
+    def from_override(cls,path:Path)->"ProductionProfile":
+        return cls(validate_profile_override(path))
 
     def load_bootstrap(self) -> dict:
         value = json.loads(self.bootstrap_path.read_text(encoding="utf-8")) if self.bootstrap_path.exists() else {}

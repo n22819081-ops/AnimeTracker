@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt,QUrl,Signal
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QFormLayout, QFrame, QGridLayout, QGroupBox, QHBoxLayout,
+    QApplication,QCheckBox, QComboBox, QFormLayout, QFrame, QGridLayout, QGroupBox, QHBoxLayout,
     QLabel, QLineEdit, QListWidget, QPushButton, QScrollArea, QTabWidget, QTableWidget,
     QTableWidgetItem, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
 from ..data import ModernRepository
 from ..widgets import AnimeTable, EmptyState, StatusBadge
+from ...runtime import APP_NAME,APP_VERSION,BUILD_IDENTIFIER,RELEASE_MANIFEST_NAME
 
 
 class Page(QWidget):
@@ -186,13 +189,25 @@ class HistoryPage(Page):
         for row in range(self.table.rowCount()):self.table.setRowHidden(row,bool(query) and query not in " ".join((self.table.item(row,column).text() if self.table.item(row,column) else "") for column in range(self.table.columnCount())).casefold())
 
 
+class AboutPage(QWidget):
+    def __init__(self,diagnostics):
+        super().__init__();self.diagnostics=diagnostics or {};layout=QVBoxLayout(self);title=QLabel(f"{APP_NAME} {APP_VERSION}");title.setObjectName("pageTitle");layout.addWidget(title)
+        form=QFormLayout();form.addRow("Build identifier",QLabel(BUILD_IDENTIFIER));form.addRow("Schema version",QLabel(str(self.diagnostics.get("schema_version","Not initialized"))));form.addRow("Data location",QLabel(str(self.diagnostics.get("production_profile_path","Per-user profile"))));form.addRow("Code signing",QLabel("Unsigned release candidate"));form.addRow("Release manifest",QLabel(RELEASE_MANIFEST_NAME));form.addRow("License",QLabel("See THIRD_PARTY_NOTICES.md and bundled dependency licenses"));layout.addLayout(form)
+        safety=QLabel("Media safety: read-only Jellyfin access. Anime Tracker does not rename, move, replace, or delete media.");safety.setWordWrap(True);safety.setObjectName("profileBanner");layout.addWidget(safety)
+        actions=QHBoxLayout();data=QPushButton("Open Data Folder");logs=QPushButton("Open Logs");copy=QPushButton("Copy Diagnostic Summary");data.clicked.connect(lambda:QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.diagnostics.get("production_profile_path","")))));logs.clicked.connect(lambda:QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(str(self.diagnostics.get("production_profile_path","")))/"logs"))));copy.clicked.connect(self._copy)
+        actions.addWidget(data);actions.addWidget(logs);actions.addWidget(copy);actions.addStretch();layout.addLayout(actions);layout.addStretch()
+    def _copy(self):
+        safe={key:value for key,value in self.diagnostics.items() if key not in {"production_profile_path","credentials"}}
+        QApplication.clipboard().setText(json.dumps(safe,indent=2,default=str))
+
+
 class SettingsPage(Page):
     theme_changed=Signal(str); reset_requested=Signal(); preview_requested=Signal(); schedule_run_requested=Signal(); schedule_install_requested=Signal(); schedule_logs_requested=Signal()
     def __init__(self,settings,*,production=False,diagnostics=None):
         super().__init__("Settings",("Modern production settings. Jellyfin access remains read-only and explicit." if production else "Modern development-profile settings. Jellyfin access remains read-only and manual.")); self.settings=settings; self.production=production
         tabs=QTabWidget(); self.tabs=tabs; self.layout.addWidget(tabs,1)
         appearance=QWidget(); form=QFormLayout(appearance); self.theme=QComboBox(); self.theme.addItems(["Dark","Light","Follow Windows"]); self.theme.setCurrentText(settings["theme"]); self.theme.currentTextChanged.connect(self.theme_changed); form.addRow("Theme",self.theme); tabs.addTab(appearance,"Appearance")
-        jellyfin=QWidget(); jform=QFormLayout(jellyfin); self.tv=QLineEdit(settings.get("test_tv_path","")); self.movies=QLineEdit(settings.get("test_movie_path","")); self.tv.setReadOnly(production); self.movies.setReadOnly(production); jform.addRow("TV root" if production else "Test TV root",self.tv); jform.addRow("Movies root" if production else "Test Movies root",self.movies); label=QLabel("Read-only access. Production roots are never scanned automatically."); label.setObjectName("muted"); jform.addRow(label); tabs.addTab(jellyfin,"Jellyfin")
+        jellyfin=QWidget(); jform=QFormLayout(jellyfin); self.tv=QLineEdit(settings.get("test_tv_path","")); self.movies=QLineEdit(settings.get("test_movie_path","")); jform.addRow("TV root" if production else "Test TV root",self.tv); jform.addRow("Movies root" if production else "Test Movies root",self.movies); label=QLabel("Read-only access. Production roots are never scanned automatically."); label.setObjectName("muted"); jform.addRow(label); tabs.addTab(jellyfin,"Jellyfin")
         notifications=QWidget(); nform=QFormLayout(notifications);credentials={item.get("channel_purpose"):item for item in (diagnostics or {}).get("credentials",())}
         self.private_notifications=QCheckBox("Generate private Discord events");self.private_notifications.setChecked(settings.get("notifications_private_enabled",settings.get("private_notifications_enabled",False)))
         self.shared_notifications=QCheckBox("Generate shared Discord events");self.shared_notifications.setChecked(settings.get("notifications_shared_enabled",settings.get("shared_notifications_enabled",False)))
@@ -210,4 +225,4 @@ class SettingsPage(Page):
         diagnostic_widget=QWidget();dform=QFormLayout(diagnostic_widget)
         for key,value in (diagnostics or {"profile_state":"Development profile","database_integrity":"Not checked","media_safety":"READ_ONLY"}).items():
             if isinstance(value,(str,int,bool)):dform.addRow(key.replace("_"," ").title(),QLabel(str(value)))
-        tabs.addTab(diagnostic_widget,"Diagnostics");tabs.addTab(EmptyState("About","Anime Tracker 0.8.0 pre-release production migration." if production else "Anime Tracker development profile."),"About")
+        tabs.addTab(diagnostic_widget,"Diagnostics");tabs.addTab(AboutPage(diagnostics),"About")

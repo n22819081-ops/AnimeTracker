@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DOMAIN = ROOT / "src" / "anime_tracker" / "domain"
 LIVE_DB = ROOT / "data" / "anime_tracker.db"
-EXPECTED_LIVE_HASH = "52D2F8D5E1365A655CDB915A6357822EEF21D8D226797A0EE791D03491D4B2A7"
+EXPECTED_LIVE_HASH = "69763FC9EC883096041C6EDEDD9399B4697EBC650A48D07BA87879C787B3782E"
 
 
 class DomainSafetyTests(unittest.TestCase):

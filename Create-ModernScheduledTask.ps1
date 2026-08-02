@@ -3,16 +3,18 @@ param(
     [ValidateSet("Daily", "Weekly")][string]$Frequency = "Weekly",
     [ValidateSet("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")][string]$DayOfWeek = "Sunday",
     [string]$Time = "10:00",
-    [switch]$StartWhenAvailable
+    [switch]$StartWhenAvailable,
+    [Parameter(Mandatory = $true)][string]$ExecutablePath,
+    [Parameter(Mandatory = $true)][string]$ProfilePath
 )
 
 $ErrorActionPreference = "Stop"
-$Root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$Pythonw = Join-Path $Root ".venv\Scripts\pythonw.exe"
 $TaskName = "Anime Tracker Modern - Validation"
-if (-not (Test-Path -LiteralPath $Pythonw)) { throw "Modern Python environment was not found." }
+if (-not (Test-Path -LiteralPath $ExecutablePath -PathType Leaf)) { throw "Packaged Anime Tracker executable was not found." }
+if (-not [System.IO.Path]::IsPathRooted($ProfilePath)) { throw "Profile path must be absolute." }
 
-$Action = New-ScheduledTaskAction -Execute $Pythonw -Argument "-m anime_tracker.production.scheduled_command --profile `"$Root\production_profile`"" -WorkingDirectory $Root
+$WorkingDirectory = Split-Path -Parent $ExecutablePath
+$Action = New-ScheduledTaskAction -Execute $ExecutablePath -Argument "--scheduled-check --profile `"$ProfilePath`"" -WorkingDirectory $WorkingDirectory
 if ($Frequency -eq "Weekly") { $Trigger = New-ScheduledTaskTrigger -Weekly -WeeksInterval 1 -DaysOfWeek $DayOfWeek -At $Time }
 else { $Trigger = New-ScheduledTaskTrigger -Daily -At $Time }
 $Settings = New-ScheduledTaskSettingsSet -StartWhenAvailable:$StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 4)

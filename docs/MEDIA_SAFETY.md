@@ -1,5 +1,7 @@
 # Media Safety
 
+Release 1.0.0 preserves the core rule: Jellyfin library roots are scan inputs only. No packaged operation renames, moves, modifies, replaces, or deletes media. Writes are confined to the selected Anime Tracker profile, temporary adoption/backup staging, and installed application files.
+
 Anime Tracker is a read-only tracker and scanner. It never modifies Jellyfin media.
 
 It may read these configured roots:

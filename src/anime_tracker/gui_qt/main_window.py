@@ -20,6 +20,7 @@ from .pages import (
 from .profile import ModernProfile
 from .theme import apply_theme
 from .workers import BackgroundWorker, WorkerProgress
+from ..runtime import APP_VERSION
 
 
 PAGE_LABELS = (
@@ -32,8 +33,8 @@ class MainWindow(QMainWindow):
     page_changed = Signal(str)
 
     def __init__(self, profile: ModernProfile, repository: ModernRepository, parent=None, *, production=False) -> None:
-        super().__init__(parent); self.profile=profile; self.repository=repository; self.production=production; self.settings=profile.load_settings(); self.settings=({**profile.load_bootstrap(),**self.settings,**_production_root_settings()} if production else self.settings); self.thread_pool=QThreadPool(self); self.workers={}
-        self.setWindowTitle("Anime Tracker · Production Profile" if production else "Anime Tracker · Development / Migration Test Profile"); self.setMinimumSize(1200,760); self.resize(1380,860)
+        super().__init__(parent); self.profile=profile; self.repository=repository; self.production=production; self.settings=profile.load_settings(); self.settings=({**profile.load_bootstrap(),**self.settings,**_production_root_settings(profile)} if production else self.settings); self.thread_pool=QThreadPool(self); self.workers={}
+        self.setWindowTitle(f"Anime Tracker {APP_VERSION} · Production Profile" if production else f"Anime Tracker {APP_VERSION} · Development / Migration Test Profile"); self.setMinimumSize(1200,760); self.resize(1380,860)
         self._build(); self._restore(); apply_theme(QApplication.instance(),self.settings.get("theme","Dark"))
 
     def _build(self):
@@ -121,7 +122,7 @@ class MainWindow(QMainWindow):
 
     def start_scan(self):
         if self.production:
-            message="Scan these roots read-only?\n\n"+"\n".join(_production_root_lines())+"\n\nNo media files or folders will be modified."
+            message="Scan these roots read-only?\n\n"+"\n".join(_production_root_lines(self.profile))+"\n\nNo media files or folders will be modified."
             if QMessageBox.question(self,"Confirm read-only Jellyfin scan",message)!=QMessageBox.Yes:return
             self._start_worker("Read-only production inventory scan",_production_scan,self.profile);return
         settings_page=self.pages["Settings"]
@@ -222,7 +223,7 @@ def _production_scheduled_check(profile,*,cancel_event,progress):
 
 def _production_install_task(profile,settings,*,cancel_event,progress):
     from ..production.task_scheduler import install_validation_task
-    progress(0,1,"Requesting Windows Task Scheduler validation task");result=install_validation_task(profile.root.parent,settings);progress(1,1,"Validation task request completed");return result
+    progress(0,1,"Requesting Windows Task Scheduler validation task");result=install_validation_task(profile.root,settings);progress(1,1,"Validation task request completed");return result
 
 
 def _production_search_provider(profile):
@@ -236,11 +237,12 @@ def _production_search_provider(profile):
     return provider
 
 
-def _production_root_settings():
-    from ..production.operations import LIVE_ROOTS
-    return {"test_tv_path":LIVE_ROOTS[0].path,"test_movie_path":LIVE_ROOTS[1].path}
+def _production_root_settings(profile):
+    from ..production.operations import configured_roots
+    roots={root.library_kind.value:root.path for root in configured_roots(profile)}
+    return {"test_tv_path":roots.get("TV",""),"test_movie_path":roots.get("MOVIE","")}
 
 
-def _production_root_lines():
-    from ..production.operations import LIVE_ROOTS
-    return tuple(f"{root.label}: {root.path}" for root in LIVE_ROOTS)
+def _production_root_lines(profile):
+    from ..production.operations import configured_roots
+    return tuple(f"{root.label}: {root.path}" for root in configured_roots(profile))

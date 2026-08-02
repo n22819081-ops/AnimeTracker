@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "anime-tracker"
-version = "0.8.0"
+version = "1.0.0"
 description = "Local Windows desktop tracker for anime planned for Jellyfin"
 requires-python = ">=3.10"
 dependencies = [

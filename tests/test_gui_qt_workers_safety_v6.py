@@ -18,7 +18,7 @@ from anime_tracker.gui_qt.covers import CoverImageCache
 
 ROOT=Path(__file__).resolve().parents[1]
 LIVE=ROOT/"data"/"anime_tracker.db"
-LIVE_HASH="52D2F8D5E1365A655CDB915A6357822EEF21D8D226797A0EE791D03491D4B2A7"
+LIVE_HASH="69763FC9EC883096041C6EDEDD9399B4697EBC650A48D07BA87879C787B3782E"
 
 
 def operation(steps=5,*,cancel_event,progress):

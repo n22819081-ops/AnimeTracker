@@ -12,10 +12,11 @@ from PySide6 import __version__ as pyside_version
 
 from ..modernization.backup import sqlite_integrity_check
 from .profile import ProductionProfile
+from ..runtime import APP_VERSION,BUILD_IDENTIFIER
 
 
 class DiagnosticsReporter:
-    def __init__(self,profile:ProductionProfile,*,version="0.8.0")->None:self.profile=profile;self.version=version
+    def __init__(self,profile:ProductionProfile,*,version=APP_VERSION)->None:self.profile=profile;self.version=version
 
     def health(self,*,local_only=False)->dict:
         bootstrap=self.profile.load_bootstrap();database=self.profile.database_path
@@ -28,6 +29,7 @@ class DiagnosticsReporter:
             errors=Counter(row[0] for row in connection.execute("SELECT last_error_type FROM notification_outbox WHERE last_error_type<>''"))
         backups=sorted((item for item in self.profile.backups_dir.iterdir() if item.is_dir()),reverse=True) if self.profile.backups_dir.exists() else []
         value={"version":self.version,"schema_version":schema,"profile_state":bootstrap.get("migration_state"),"cutover_state":bootstrap.get("cutover_state"),"production_profile_path":str(self.profile.root) if local_only else "Production Profile","database_integrity":sqlite_integrity_check(database),"counts":counts,"last_backup":backups[0].name if backups else "none","last_anilist_refresh":bootstrap.get("initial_anilist_baseline_at","never"),"cache_state":"available" if (self.profile.cache_dir/"anilist").exists() else "missing","last_jellyfin_scan":last_scan or "never","inventory_completeness":"COMPLETE" if last_scan else "NO_COMPLETE_SNAPSHOT","credentials":credentials,"scheduled_task_status":"NOT_INSTALLED_OR_UNVERIFIED","last_scheduled_run":last_run,"recent_error_types":dict(errors),"storage_checker_isolation":"ENFORCED","media_safety":"READ_ONLY","notifications_stage":bootstrap.get("notifications_stage",1)}
+        value["build_identifier"]=BUILD_IDENTIFIER
         return value
 
     def write_support_report(self,path:Path)->Path:

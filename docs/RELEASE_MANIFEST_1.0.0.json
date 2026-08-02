@@ -1,0 +1,51 @@
+{
+  "product": "Anime Tracker",
+  "version": "1.0.0",
+  "build_identifier": "1.0.0-rc1",
+  "build_date": "2026-08-02",
+  "main_executable": "Anime Tracker.exe",
+  "main_executable_sha256": "B3E8771F0D306FCBBB38D91BE274B77E4E74F8CD17F79ACA7E63BFD6A96945B6",
+  "installer": "Anime-Tracker-Setup-1.0.0.exe",
+  "installer_sha256": "8EDDDCC26A62B8E0F254C275C4E2B1A2FDDA0B6854B0EF8073D3A8DC42718860",
+  "portable_zip": "Anime-Tracker-Portable-1.0.0.zip",
+  "portable_zip_sha256": "63E7D61B4998E620A21967503B10887505F8F947902E726EF4E9303914BF0EAF",
+  "distribution_file_count": 224,
+  "main_executable_size": 3309839,
+  "installer_size": 124657693,
+  "portable_size": 49570338,
+  "schema_version": 6,
+  "supported_windows": [
+    "Windows 10 x64",
+    "Windows 11 x64"
+  ],
+  "test_totals": "659 passed, 47 subtests passed, 0 failed in 40.19s",
+  "clean_machine_environment": "Development Windows 11 machine with disposable profiles; no independent clean VM",
+  "installer_test_result": "BLOCKED before process creation by controlled environment policy",
+  "reinstall_result": "BLOCKED before process creation by controlled environment policy",
+  "uninstall_result": "BLOCKED before process creation by controlled environment policy",
+  "profile_adoption_result": "PASS on disposable production-profile copy; source retained",
+  "code_signing": "UNSIGNED",
+  "defender_scan": {
+    "date": "2026-08-02",
+    "engine": "1.1.26060.3008",
+    "platform": "4.18.26060.3008",
+    "signature": "1.455.472.0",
+    "distribution": "NO_THREATS",
+    "installer": "NO_THREATS",
+    "portable_zip": "NO_THREATS"
+  },
+  "privacy_audit": "PASS",
+  "security_audit": "PASS (static and source runtime); packaged execution blocked by environment policy",
+  "known_limitations": [
+    "Unsigned release candidate",
+    "SmartScreen may warn",
+    "Direct packaged execution and installer lifecycle tests blocked by the controlled environment",
+    "AniList availability required for live refresh",
+    "Movie digital availability can require manual confirmation",
+    "Absolute episode numbering can require manual review",
+    "Eight current production review cases",
+    "Optional Jellyfin API deferred",
+    "Discord and scheduling remain opt-in",
+    "Legacy task remains active until explicitly replaced"
+  ]
+}

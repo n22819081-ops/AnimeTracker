@@ -20,7 +20,13 @@ from ..services.server_inventory.service import FilesystemInventoryService
 from .profile import ProductionProfile
 
 
-LIVE_ROOTS=(LibraryRoot("TV Library",r"I:\Jellyfin_Media\TV-SHOWs",LibraryKind.TV),LibraryRoot("Movies Library",r"I:\Jellyfin_Media\Movies",LibraryKind.MOVIE))
+def configured_roots(profile:ProductionProfile)->tuple[LibraryRoot,...]:
+    settings=profile.load_settings();values=(settings.get("test_tv_path",""),settings.get("test_movie_path",""))
+    if not all(values) and profile.database_path.is_file():
+        with closing(sqlite3.connect(f"file:{profile.database_path.as_posix()}?mode=ro",uri=True)) as connection:
+            stored=dict(connection.execute("SELECT key,value FROM application_settings WHERE key IN ('tv_path','movie_path')"))
+        values=(values[0] or stored.get("tv_path",""),values[1] or stored.get("movie_path",""))
+    return tuple(root for root in (LibraryRoot("TV Library",values[0],LibraryKind.TV) if values[0] else None,LibraryRoot("Movies Library",values[1],LibraryKind.MOVIE) if values[1] else None) if root)
 
 
 class ProductionAniListOperations:
@@ -59,10 +65,11 @@ class ProductionAniListOperations:
 class ProductionInventoryOperations:
     def __init__(self,profile:ProductionProfile,service:FilesystemInventoryService|None=None)->None:self.profile=profile;self.service=service or FilesystemInventoryService()
 
-    def scan(self,*,confirmed:bool,roots=LIVE_ROOTS,token=None,allow_test_roots=False)->dict:
+    def scan(self,*,confirmed:bool,roots=None,token=None,allow_test_roots=False)->dict:
         if not confirmed:raise PermissionError("The first production Jellyfin scan requires explicit confirmation.")
-        roots=tuple(roots)
-        if not allow_test_roots and tuple((root.label,root.path,root.library_kind) for root in roots)!=tuple((root.label,root.path,root.library_kind) for root in LIVE_ROOTS):raise PermissionError("Production scanning is restricted to the configured read-only roots.")
+        configured=configured_roots(self.profile);roots=tuple(configured if roots is None else roots)
+        if not roots:raise ValueError("No Jellyfin roots are configured.")
+        if not allow_test_roots and tuple((root.label,root.path,root.library_kind) for root in roots)!=tuple((root.label,root.path,root.library_kind) for root in configured):raise PermissionError("Production scanning is restricted to the configured read-only roots.")
         started=datetime.now(timezone.utc);snapshot=self.service.scan(roots,token=token);completed=datetime.now(timezone.utc)
         complete=not snapshot.canceled and all(root.status in {RootScanStatus.COMPLETE,RootScanStatus.EMPTY} for root in snapshot.roots)
         snapshot_id=f"inventory-{uuid.uuid4().hex}"

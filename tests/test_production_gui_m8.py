@@ -27,7 +27,7 @@ def test_completed_migration_opens_production_window_with_disabled_activation(qt
     profile=production_profile(tmp_path);app,window,value=create_production_application(profile.root);qtbot.addWidget(window)
     assert window.production and "Production Profile" in window.windowTitle()
     settings=window.pages["Settings"];assert not settings.schedule_enabled.isChecked() and not settings.schedule_private.isChecked() and not settings.schedule_shared.isChecked()
-    assert settings.tv.isReadOnly() and settings.movies.isReadOnly()
+    assert not settings.tv.isReadOnly() and not settings.movies.isReadOnly()
 
 
 def test_launcher_has_explicit_test_reset_and_no_broad_reset():
