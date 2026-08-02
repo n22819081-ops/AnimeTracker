@@ -1,0 +1,27 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# Live user data, credentials, logs, and transient locks
+data/
+logs/
+backups/
+modernization_backups/
+migration_test/
+*.lock
+**/scheduled_check.lock
+*webhook*.json
+*secret*.json
+
+# Generated exports and packaged applications
+exports/
+*.csv
+*.tsv
+build/
+dist/
+*.spec
+
+# The Jellyfin Storage Checker is a separate product.
+jellyfin storage checker/

@@ -1,0 +1,112 @@
+# Anime Tracker
+
+Anime Tracker is a local Windows desktop app for tracking anime you want to add to a Jellyfin server. It uses AniList public GraphQL queries for metadata and stores local tracking state in SQLite.
+
+The app scans Jellyfin folders read-only. It never renames, moves, modifies, replaces, or deletes anything in your media folders.
+
+## Install
+
+From PowerShell:
+
+```powershell
+.\Install.ps1
+```
+
+This creates a local virtual environment and installs Python dependencies.
+
+## Run
+
+```powershell
+.\Run-AnimeTracker.ps1
+```
+
+Or directly:
+
+```powershell
+.\.venv\Scripts\python.exe -m anime_tracker.app
+```
+
+## Scheduled Daily Check
+
+```powershell
+.\Create-ScheduledTask.ps1
+```
+
+The scheduled task runs once daily, silently refreshes AniList status, scans Jellyfin folders, and sends notifications only when meaningful changes occur.
+
+## Notifications
+
+Open `Settings` to configure notifications.
+
+- Discord notifications are the primary notification method.
+- The Discord webhook URL is stored in `data/notification_config.json`.
+- That local config file is excluded by `.gitignore`.
+- After the webhook is saved, the app only shows `Saved (hidden)` and does not display the full URL again.
+- Windows toast notifications can be enabled as an optional secondary method.
+
+Use `Send Test Notification` to verify the Discord webhook.
+
+Discord notifications are sent once per event for:
+
+- Upcoming to Currently Airing
+- Currently Airing to Finished
+- tracked title found on Jellyfin
+- release-date changes
+- repeated AniList API failures requiring attention
+
+Each Discord message uses an embed with titles, previous/new status, episode count, Jellyfin found state, AniList link, cover image when available, and timestamp.
+
+## Jellyfin Paths
+
+Default paths:
+
+- `I:\Jellyfin_Media\TV-SHOWs`
+- `I:\Jellyfin_Media\Movies`
+
+You can edit paths in the app with `Settings`.
+
+## Usage
+
+- `Add Anime`: type a title, paste an AniList URL, or paste an AniList ID.
+- `Check All`: refresh tracked entries from AniList.
+- `Scan Jellyfin`: read-only scan of configured Jellyfin roots.
+- `Mark Added`: manually mark an entry as on server.
+- `Edit`: edit notes, manual movie availability, server path, or status.
+- `Remove from Tracker`: removes only the local tracker record after confirmation.
+- `Export CSV`: export tracker rows.
+- `Send Test Notification`: send a Discord test embed using the saved webhook.
+
+## Movie Behavior
+
+Anime movies are not considered ready just because AniList has a theatrical start date. Movie entries stay in `Movie Theatrical Only` until you manually confirm digital/Blu-ray availability, then they move to `Movie Digitally Available`.
+
+## Sample Data
+
+Run:
+
+```powershell
+.\.venv\Scripts\python.exe -m anime_tracker.app --sample-data
+```
+
+## Tests
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+```
+
+If `pytest` is unavailable:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests
+```
+
+## Files
+
+- `src/anime_tracker/app.py`: GUI and command-line entry point.
+- `src/anime_tracker/anilist.py`: AniList GraphQL client.
+- `src/anime_tracker/database.py`: SQLite schema and persistence.
+- `src/anime_tracker/status.py`: tracker status transition rules.
+- `src/anime_tracker/scanner.py`: read-only Jellyfin matching.
+- `src/anime_tracker/config.py`: local notification config storage.
+- `src/anime_tracker/notifications.py`: Discord embeds and optional Windows toast notifications.
+- `tests/`: automated tests.
