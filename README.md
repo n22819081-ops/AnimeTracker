@@ -4,13 +4,15 @@ Anime Tracker is a local Windows desktop app for tracking anime you want to add 
 
 ## Modernization Status
 
-Modernization Milestones 1 through 3 establish verified backups, reconciled copy-only migration data, typed domain/status rules, and a modern cache-aware AniList service with structured batches, airing events, and franchise graphs. The modern packages are not yet wired into the Tkinter application and do not replace the live database or legacy AniList client.
+Modernization Milestones 1 through 4 establish verified backups, reconciled copy-only migration data, typed domain/status rules, a modern cache-aware AniList service, and a typed read-only server inventory with deterministic season and episode observations. The modern packages are not yet wired into the Tkinter application and do not replace the live database, legacy AniList client, or legacy scanner.
 
 Milestone documentation is under `docs/`. The disposable prototype is created under ignored `migration_test/`, and the immutable checkpoint is under ignored `modernization_backups/`.
 
 The separate `jellyfin storage checker` is a different product. It is excluded from Git and modernization and must not be invoked or modified by Anime Tracker.
 
 The app scans Jellyfin folders read-only. It never renames, moves, modifies, replaces, or deletes anything in your media folders.
+
+The modern Milestone 4 inventory also recognizes the protected Anime root at `I:\Jellyfin_Media\Anime`. Production GUI integration remains deferred to Milestone 7.
 
 ## Install
 
@@ -116,6 +118,7 @@ If `pytest` is unavailable:
 - `src/anime_tracker/status.py`: tracker status transition rules.
 - `src/anime_tracker/domain/`: persistence-neutral modern domain models and deterministic rules (not yet a production cutover).
 - `src/anime_tracker/services/anilist/`: typed modern AniList client, cache, batches, schedules, and franchise graph (not yet wired into production).
+- `src/anime_tracker/services/server_inventory/`: transient typed filesystem snapshots, conservative media parsing, diagnostics, cancellation, and incremental reuse (not yet wired into production).
 - `src/anime_tracker/scanner.py`: read-only Jellyfin matching.
 - `src/anime_tracker/config.py`: local notification config storage.
 - `src/anime_tracker/notifications.py`: Discord embeds and optional Windows toast notifications.

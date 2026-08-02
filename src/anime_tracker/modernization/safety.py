@@ -6,6 +6,7 @@ from pathlib import Path
 DEFAULT_PROTECTED_ROOTS = (
     Path(r"I:\Jellyfin_Media\TV-SHOWs"),
     Path(r"I:\Jellyfin_Media\Movies"),
+    Path(r"I:\Jellyfin_Media\Anime"),
 )
 
 

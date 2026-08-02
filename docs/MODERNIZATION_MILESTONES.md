@@ -28,6 +28,8 @@ Status: implemented and regression-validated beside the unchanged legacy client.
 
 Build incremental filesystem snapshots and optional read-only Jellyfin API discovery for shows, seasons, episodes, movies, and specials.
 
+Status: implemented and regression-validated as a transient service beside the unchanged legacy scanner. Filesystem snapshots, typed diagnostics, conservative parsing, cancellation, and unchanged-file reuse are available. The optional Jellyfin API adapter is deferred; no production GUI, database, matching, notification, or scheduling path uses this service yet.
+
 ## Milestone 5: Matching And Review
 
 Implement many-to-one mappings, explicit season targets, Season 00 suggestions, durable rejections, title-wide auto-match blocks, and review-case workflows.
@@ -48,4 +50,4 @@ Integrate scheduling, verified backup/restore, credential migration, diagnostics
 
 Package a Windows application, validate on a clean user profile, test upgrade/rollback, and publish a versioned release.
 
-Milestone 4 and later are not part of the current implementation.
+Milestone 5 and later are not part of the current implementation.

@@ -6,6 +6,7 @@ It may read these configured roots:
 
 - `I:\Jellyfin_Media\TV-SHOWs`
 - `I:\Jellyfin_Media\Movies`
+- `I:\Jellyfin_Media\Anime`
 
 It must never rename, move, copy, replace, delete, edit, transcode, retimestamp, chmod, or otherwise modify files or folders in those libraries. It must never edit embedded metadata or invoke Sonarr/Radarr imports.
 
@@ -18,3 +19,5 @@ The Milestone 2 domain package has no filesystem APIs, media-root strings, scann
 The Milestone 3 AniList service writes only explicitly configured schema-v3 cache databases. It contains no Jellyfin scanner, media-root, Discord, GUI, subprocess, or Task Scheduler dependency. Automated requests use injected fake sessions. AniList request variables contain only provider search/ID/filter/schedule values, never local media data.
 
 Optional Jellyfin API support may be added later only for read-only queries. Filesystem scanning remains available without an API key.
+
+The Milestone 4 filesystem inventory uses only directory enumeration and file metadata reads. Automated coverage uses temporary fixture roots. The inventory does not create a cache, database, marker, lock, sidecar, or log file under a media root.
