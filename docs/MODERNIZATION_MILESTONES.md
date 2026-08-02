@@ -46,6 +46,8 @@ Status: implemented and regression-validated beside the unchanged legacy notifie
 
 Build the dark desktop interface, background workers, progress/cancellation, accessible review tools, and diagnostics.
 
+Status: implemented and regression-validated as a separate development application. It uses an ignored disposable profile, schema-v5 migration-test copy, test paths, disabled delivery, and read-only workflows. The legacy Tkinter application and launchers remain available. Production cutover, scheduling integration, packaging, and operational enablement remain deferred.
+
 ## Milestone 8: Operations And Cutover
 
 Integrate scheduling, verified backup/restore, credential migration, diagnostics, dual-read comparison, and production database cutover.
@@ -54,4 +56,4 @@ Integrate scheduling, verified backup/restore, credential migration, diagnostics
 
 Package a Windows application, validate on a clean user profile, test upgrade/rollback, and publish a versioned release.
 
-Milestone 6 and later are not part of the current implementation.
+Milestone 8 and later are not part of the current implementation.

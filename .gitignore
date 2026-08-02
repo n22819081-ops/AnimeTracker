@@ -10,6 +10,7 @@ logs/
 backups/
 modernization_backups/
 migration_test/
+modern_profile_test/
 *.lock
 **/scheduled_check.lock
 *webhook*.json
