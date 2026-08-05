@@ -28,6 +28,10 @@ From PowerShell:
 .\Install.ps1
 ```
 
+The installer uses a native python.org CPython 3.10+ interpreter and ignores
+MSYS2, Cygwin, and MinGW Python executables that may appear earlier on a
+temporary process `PATH`. It does not change the global Windows `PATH`.
+
 This creates a local virtual environment and installs Python dependencies.
 
 ## Run

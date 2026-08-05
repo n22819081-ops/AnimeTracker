@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import subprocess
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
@@ -117,6 +119,7 @@ def test_packaging_is_windowed_per_user_and_preserves_data():
     assert "console=False" in spec and "name='Anime Tracker'" in spec and "PySide6.QtNetwork" in spec
     hook=(root/"packaging"/"hooks"/"hook-PySide6.QtNetwork.py").read_text(encoding="utf-8")
     assert "add_qt6_dependencies" in hook and "collect_qtnetwork_files" not in hook
+    assert 'endswith("qopensslbackend.dll")' in hook
     assert "PrivilegesRequired=lowest" in installer and "DefaultDirName={localappdata}\\Programs\\Anime Tracker" in installer
     assert "scheduled" not in installer.casefold() and "production_profile" not in installer
     assert "UninstallDelete" in installer and "User data" in installer
@@ -131,6 +134,25 @@ def test_release_artifact_names():
     tools=(Path(__file__).parents[1]/"packaging"/"release_tools.py").read_text(encoding="utf-8")
     assert "Anime-Tracker-Setup-{APP_VERSION}.exe" in tools
     assert "Anime-Tracker-Portable-{APP_VERSION}.zip" in tools
+
+
+def test_installer_rejects_posix_python_and_uses_an_explicit_interpreter():
+    script=(Path(__file__).parents[1]/"Install.ps1").read_text(encoding="utf-8")
+    assert "Find-NativePython" in script
+    assert "msys\\d*|cygwin\\d*|mingw\\d*" in script
+    assert "& $BasePython -m venv $Venv" in script
+    assert "python -m venv" not in script
+    assert "$env:Path =" in script and "Join-Path $Venv 'Scripts'" in script
+
+
+def test_qt_network_ignores_msys_openssl_collision(tmp_path):
+    msys=Path(r"C:\msys64\ucrt64\bin")
+    if not (msys/"libssl-3-x64.dll").is_file():pytest.skip("MSYS2 OpenSSL is not installed")
+    env=os.environ.copy();env["PATH"]=str(msys)+os.pathsep+env.get("PATH","");env["QT_QPA_PLATFORM"]="offscreen"
+    code=f"from anime_tracker.gui_qt.covers import CoverImageCache; from PySide6.QtWidgets import QApplication; from PySide6.QtNetwork import QSslSocket; app=QApplication([]); cache=CoverImageCache({str(tmp_path)!r}); print(QSslSocket.activeBackend())"
+    result=subprocess.run([sys.executable,"-c",code],capture_output=True,text=True,timeout=15,env=env)
+    assert result.returncode==0,result.stderr
+    assert result.stdout.strip()=="schannel"
 
 
 @pytest.mark.skipif(not (Path(__file__).parents[1]/"packaging"/"installer-staging"/"Anime Tracker.bin").is_file(),reason="release build not present")
@@ -149,6 +171,7 @@ def test_built_distribution_has_required_runtime_plugins_and_no_user_data():
     for path in (plugins/"platforms"/"qwindows.dll",plugins/"imageformats"/"qjpeg.dll",plugins/"styles"/"qmodernwindowsstyle.dll",plugins/"tls"/"qschannelbackend.dll",dist/"_internal"/"sqlite3.dll",dist/"_internal"/"Create-ModernScheduledTask.ps1"):assert path.is_file()
     names={path.name.casefold() for path in dist.rglob("*") if path.is_file()}
     assert not any(name.endswith((".db",".sqlite")) for name in names)
+    assert "qopensslbackend.dll" not in names
     assert not ({"logs","backups","production_profile"}&{path.name.casefold() for path in dist.rglob("*")})
 
 
@@ -157,7 +180,7 @@ def test_portable_zip_matches_onedir_and_has_no_python_source_or_profile():
     import zipfile
     path=Path(__file__).parents[1]/"release"/"1.0.0"/"Anime-Tracker-Portable-1.0.0.zip"
     with zipfile.ZipFile(path) as archive:
-        names=archive.namelist();assert archive.testzip() is None and len(names)==224
+        names=archive.namelist();assert archive.testzip() is None and len(names)==223
     assert "Anime Tracker/Anime Tracker.exe" in names
     assert not any(name.casefold().endswith((".py",".db",".sqlite")) for name in names)
     assert not any("production_profile" in name.casefold() or "storage checker" in name.casefold() for name in names)

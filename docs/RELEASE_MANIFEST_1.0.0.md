@@ -2,11 +2,11 @@
 
 Build `1.0.0-rc1` dated 2026-08-04; schema 6; unsigned.
 
-- Main EXE: `Anime Tracker.exe` (`FFD20A17520EDB8C3D0EFAFBE95182371C213591DF50C9A6F782A1817406945A`)
-- Installer: `Anime-Tracker-Setup-1.0.0.exe` (`401B6EC3070100E190754A8A62AAAFA17188ABF520F776A32787FA9643B1D5CC`)
-- Portable ZIP: `Anime-Tracker-Portable-1.0.0.zip` (`E390B58C033E332546C13AEB545D844D98C29CB51F9D6D74EE91DF6E2E7AB32B`)
-- Distribution: 224 files
-- Tests: 686 passed, 0 failed in 48.63s
+- Main EXE: `Anime Tracker.exe` (`49B0676CFAB5C7761CFD7716D7FCE66B27A205CC2DC7B5DF70763CB0CD8EFD7F`)
+- Installer: `Anime-Tracker-Setup-1.0.0.exe` (`1EBFECCB3537591B9D49B5B85DFCAF05369CF74CD56AFE9537BF3C57466A9AA7`)
+- Portable ZIP: `Anime-Tracker-Portable-1.0.0.zip` (`01F04C81E888CEDC8FBAD086393DF13972DD8528328A17013C977F3B30C87B23`)
+- Distribution: 223 files
+- Tests: 688 passed, 0 failed in 45.78s
 - Installer/reinstall: PASS, final per-user package installed over current build
 - Profile adoption: PASS on disposable production-profile copy; source retained
 - Existing-profile detection: PASS: absolute project-local path, read-only integrity/FK/schema/count validation, both actions enabled

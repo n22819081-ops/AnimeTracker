@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QObject, QRect, QSize, Qt, QUrl, Signal
 from PySide6.QtGui import QColor, QPainter, QPen, QPixmap
-from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
+from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest, QSslSocket
 from PySide6.QtWidgets import QStyledItemDelegate
 
 from ..services.anilist.cancellation import Cancellation
@@ -17,7 +17,10 @@ class CoverImageCache(QObject):
     failed = Signal(str)
 
     def __init__(self, cache_dir: str | Path, parent=None) -> None:
-        super().__init__(parent); self.cache_dir=Path(cache_dir); self.cache_dir.mkdir(parents=True,exist_ok=True); self.network=QNetworkAccessManager(self); self.memory={}; self.pending={}; self.pending_tokens={}
+        super().__init__(parent)
+        if os.name == "nt" and not QSslSocket.setActiveBackend("schannel"):
+            raise RuntimeError("Windows Schannel TLS backend is unavailable")
+        self.cache_dir=Path(cache_dir); self.cache_dir.mkdir(parents=True,exist_ok=True); self.network=QNetworkAccessManager(self); self.memory={}; self.pending={}; self.pending_tokens={}
 
     def placeholder(self, width=100, height=140) -> QPixmap:
         pixmap=QPixmap(width,height); pixmap.fill("#343a46")

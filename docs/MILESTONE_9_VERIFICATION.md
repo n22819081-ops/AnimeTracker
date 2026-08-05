@@ -1,8 +1,8 @@
 # Milestone 9 Verification
 
-Version/build: `1.0.0` / `1.0.0-rc1`; schema 6. PyInstaller 6.21.0 produced a windowed 224-file onedir build with version/icon resources and Qt platform, image, style, network, TLS, SQLite, OpenSSL, requests, DPAPI, and notification dependencies. Inno Setup 6.7.3 compiled the per-user installer. The portable ZIP contains 224 valid members.
+Version/build: `1.0.0` / `1.0.0-rc1`; schema 6. PyInstaller 6.21.0 produced a windowed 223-file onedir build with version/icon resources and Qt platform, image, style, network, Schannel TLS, SQLite, Python OpenSSL, requests, DPAPI, and notification dependencies. Inno Setup 6.7.3 compiled the per-user installer. The portable ZIP contains 223 valid members.
 
-`pytest`: **686 passed, 0 failed in 48.63s**. Disposable source-runtime validation passed for clean schema, configurable read-only Jellyfin roots, diagnostics, all 12 pages, scheduled SUCCESS/partial/offline/lock states, backup/restore, explicit adoption/source retention, candidate-free review actions, active-profile isolation, live snapshot persistence, candidate regeneration, review reconciliation, cancellation/backoff, cover-request cancellation, evidence presentation, resize performance, and the production-profile copy. Notification delivery stayed Stage 1.
+`pytest`: **688 passed, 0 failed in 45.78s**. Disposable source-runtime validation passed for clean schema, configurable read-only Jellyfin roots, diagnostics, all 12 pages, scheduled SUCCESS/partial/offline/lock states, backup/restore, explicit adoption/source retention, candidate-free review actions, active-profile isolation, live snapshot persistence, candidate regeneration, review reconciliation, cancellation/backoff, cover-request cancellation, evidence presentation, resize performance, native-Python installer selection, hostile-PATH Qt TLS isolation, and the production-profile copy. Notification delivery stayed Stage 1.
 
 ## Existing-profile detection acceptance fix
 
@@ -28,7 +28,9 @@ Matching evidence is prose in the normal table and structured JSON only in the o
 
 The review dialog prepares its model and evidence once. Interactive fixed initial widths, elision, and a separate details panel eliminate resize-triggered fitting, wrapping, formatting, or database access. The automated 13-candidate resize test rebuilt neither evidence nor model and stayed below its performance ceiling.
 
-PyInstaller's upstream QtNetwork hook began blocking indefinitely in its build-time `QSslSocket.supportsSsl()` capability probe. A project-local hook retains standard QtNetwork dependency collection while skipping only that probe. The final 224-file distribution still contains the Schannel TLS backend and Python/OpenSSL runtime; release tests verify both.
+PyInstaller's upstream QtNetwork hook began blocking indefinitely in its build-time `QSslSocket.supportsSsl()` capability probe. A project-local hook retains standard QtNetwork dependency collection while skipping only that probe. The final 223-file distribution contains the Schannel TLS backend and Python/OpenSSL runtime; release tests verify both.
+
+An installed-system error exposed a second form of the same collision: Qt's OpenSSL backend discovered `C:\msys64\ucrt64\bin\libssl-3-x64.dll` through a temporary process `PATH`, after another incompatible crypto runtime was already loaded. Anime Tracker now removes only conflicting MSYS2/Cygwin/MinGW TLS directories from its own GUI process, explicitly selects Windows Schannel for cover-image networking, and excludes Qt's unused OpenSSL TLS plugin from the package. `Install.ps1` also resolves a native CPython 3.10+ executable explicitly and rejects POSIX-toolchain Python. No global environment variable is changed. Source and installed smoke tests pass with the conflicting MSYS2 directory deliberately placed first in `PATH`, and the installed executable exits `0` without an entry-point dialog.
 
 The user confirmed that the packaged 1.0.0 first-run screen launches on the real Windows desktop. This acceptance pass also installed the final build over the existing per-user installation and exercised Refresh All Active and Review Server Match through the real packaged GUI using a disposable profile. No clean VM was available.
 

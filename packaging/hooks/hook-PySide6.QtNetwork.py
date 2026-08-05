@@ -9,3 +9,7 @@ from PyInstaller.utils.hooks.qt import add_qt6_dependencies
 
 
 hiddenimports, binaries, datas = add_qt6_dependencies(__file__)
+
+# Anime Tracker uses native Windows Schannel. Avoid runtime discovery of an
+# unrelated OpenSSL installation through PATH (for example, MSYS2).
+binaries = [item for item in binaries if not item[0].casefold().endswith("qopensslbackend.dll")]
