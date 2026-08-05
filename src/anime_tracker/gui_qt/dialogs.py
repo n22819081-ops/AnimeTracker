@@ -5,8 +5,9 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QThreadPool, Signal
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGridLayout, QGroupBox, QHBoxLayout,
-    QLabel, QLineEdit, QListWidget, QMessageBox, QPushButton, QSpinBox, QTabWidget,
+    QHeaderView, QLabel, QLineEdit, QListWidget, QMessageBox, QPushButton, QSpinBox, QTabWidget,
     QTableWidget, QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget,
 )
 
@@ -14,6 +15,8 @@ from .covers import CoverImageCache
 from .data import AnimeRow, ModernRepository, TitleMetadata, resolve_display_title
 from .widgets import CoverageBar, StatusBadge
 from .workers import BackgroundWorker
+from .matching_presenter import candidate_target, confidence_tooltip, evidence_lines, evidence_summary, technical_evidence
+from ..services.anilist.cancellation import CancellationToken
 
 
 class AddAnimeDialog(QDialog):
@@ -85,7 +88,7 @@ class AnimeDetailDialog(QDialog):
         super().__init__(parent); self.row=row;self.details=details or {}; self.setWindowTitle(row.title); self.resize(760,660)
         layout=QVBoxLayout(self); top=QHBoxLayout(); self.cover=QLabel(); self.cover.setFixedSize(150,210); self.cover.setAlignment(Qt.AlignCenter); self.cover.setObjectName("panel")
         cache_dir=getattr(getattr(parent,"repository",None),"cover_cache_dir",Path.cwd()/"cache"/"covers")
-        self.cover_cache=CoverImageCache(cache_dir,self);self.cover.setPixmap(self.cover_cache.request(row.cover_url).scaled(150,210,Qt.KeepAspectRatio,Qt.SmoothTransformation));self.cover_cache.loaded.connect(self._cover_loaded)
+        self.cover_token=CancellationToken();self.cover_cache=CoverImageCache(cache_dir,self);self.cover.setPixmap(self.cover_cache.request(row.cover_url,self.cover_token).scaled(150,210,Qt.KeepAspectRatio,Qt.SmoothTransformation));self.cover_cache.loaded.connect(self._cover_loaded)
         info=QFormLayout(); info.addRow("Primary title",QLabel(row.title));info.addRow("English",QLabel(row.english or "Not provided by AniList")); info.addRow("Romaji",QLabel(row.romaji or "Not provided by AniList")); info.addRow("Native",QLabel(row.native or "Not provided by AniList"));info.addRow("Synonyms",QLabel(", ".join(row.synonyms) or "None provided")); info.addRow("AniList ID",QLabel(str(row.anilist_id))); info.addRow("Format",QLabel(row.media_format)); info.addRow("Season / Year",QLabel(f"{row.season or 'Not provided'} · {row.year or 'Not provided'}"));info.addRow("Episodes",QLabel(str(row.episode_count) if row.episode_count is not None else "Not provided")); top.addWidget(self.cover); top.addLayout(info,1); layout.addLayout(top)
         statuses=QHBoxLayout(); statuses.addWidget(StatusBadge(f"AniList: {row.anilist_status}")); statuses.addWidget(StatusBadge(f"Tracker: {row.tracker_status}")); statuses.addWidget(StatusBadge(f"Server: {row.server_status}")); layout.addLayout(statuses)
         tabs=QTabWidget();
@@ -103,25 +106,38 @@ class AnimeDetailDialog(QDialog):
     def _cover_loaded(self,url,pixmap):
         if url==self.row.cover_url:self.cover.setPixmap(pixmap.scaled(150,210,Qt.KeepAspectRatio,Qt.SmoothTransformation))
 
+    def closeEvent(self,event):
+        self.cover_token.cancel();self.cover_cache.cancel_pending();super().closeEvent(event)
+
 
 class MatchingReviewDialog(QDialog):
     mark_not_on_server_requested = Signal(dict)
     suppress_auto_match_requested = Signal(dict)
 
     def __init__(self,review:dict,parent=None):
-        super().__init__(parent); self.review=review; self.setWindowTitle("Review Server Match"); self.resize(780,600)
+        super().__init__(parent); self.review=review; self.setWindowTitle("Review Server Match"); self.resize(980,680); self._prepared_candidates=tuple(review.get("candidates",()))
         layout=QVBoxLayout(self); layout.addWidget(QLabel(f"{review.get('title') or 'Tracked anime'}\nAniList {review.get('anilist_id','')} · {review.get('media_format','Unknown')} · {review.get('season_name') or ''} {review.get('season_year') or ''}\nTracker: {review.get('tracker_status') or 'Unknown'} · Server: {review.get('server_status') or 'Unknown'}"))
         explanation=QLabel(f"Why this item needs review: {review.get('reason') or review.get('review_type','Decision required').replace('_',' ').title()}"); explanation.setWordWrap(True); layout.addWidget(explanation)
         mapping=QLabel(f"Current mapping: {review.get('current_mapping') or 'No confirmed server mapping'}");mapping.setWordWrap(True);layout.addWidget(mapping)
-        self.candidates=QTableWidget(0,5); self.candidates.setHorizontalHeaderLabels(["Suggested target","Confidence","Score","Evidence","Exact Jellyfin path"]); layout.addWidget(self.candidates,1)
-        for candidate in review.get("candidates",()):
+        self.candidates=QTableWidget(0,5); self.candidates.setHorizontalHeaderLabels(["Suggested target","Confidence","Match points","Evidence summary","Exact Jellyfin path"]); self.candidates.setSelectionBehavior(QAbstractItemView.SelectRows); self.candidates.setSelectionMode(QAbstractItemView.SingleSelection); self.candidates.setWordWrap(False); self.candidates.setTextElideMode(Qt.ElideRight)
+        header=self.candidates.horizontalHeader(); header.setSectionResizeMode(QHeaderView.Interactive)
+        for column,width in enumerate((260,130,100,310,360)):self.candidates.setColumnWidth(column,width)
+        self.candidates.horizontalHeaderItem(2).setToolTip("Additive points used to rank candidates. This value is not a percentage.")
+        layout.addWidget(self.candidates,1)
+        for candidate in self._prepared_candidates:
             pos=self.candidates.rowCount(); self.candidates.insertRow(pos)
-            values=(candidate.get("display_name") or candidate.get("target") or candidate.get("relative_path") or "Unnamed target",candidate.get("confidence") or "",candidate.get("score") or "",candidate.get("evidence_json") or candidate.get("evidence") or "",candidate.get("relative_path") or "")
-            for col,value in enumerate(values):self.candidates.setItem(pos,col,QTableWidgetItem(str(value)))
+            values=(candidate_target(candidate),candidate.get("confidence") or "",candidate.get("score") if candidate.get("score") is not None else "",evidence_summary(candidate),candidate.get("relative_path") or "")
+            for col,value in enumerate(values):
+                item=QTableWidgetItem(str(value));item.setToolTip(confidence_tooltip(value) if col==1 else str(value));self.candidates.setItem(pos,col,item)
+        self.details=QTextEdit(); self.details.setReadOnly(True); self.details.setMaximumHeight(150); self.details.setPlaceholderText("Select a candidate to see its season scope and full evidence."); layout.addWidget(self.details)
+        self.technical_toggle=QCheckBox("Show technical evidence"); self.technical_toggle.setToolTip("Shows the stored structured evidence for diagnostics."); layout.addWidget(self.technical_toggle)
+        self.technical_details=QTextEdit(); self.technical_details.setReadOnly(True); self.technical_details.setMaximumHeight(140); self.technical_details.hide(); layout.addWidget(self.technical_details)
+        self.candidates.itemSelectionChanged.connect(self._candidate_selected); self.technical_toggle.toggled.connect(self._technical_toggled)
         has_candidates=self.candidates.rowCount()>0
         if not has_candidates:
             self.candidates.hide(); self.empty_candidate_message=QLabel("No Jellyfin candidate was found for this title.\n\nThis title may not be on the server, or the folder name may be too different for automatic matching."); self.empty_candidate_message.setWordWrap(True); self.empty_candidate_message.setObjectName("panel"); layout.addWidget(self.empty_candidate_message,1)
         else:self.empty_candidate_message=None
+        if has_candidates:self.candidates.selectRow(0)
         self.stale=bool(review.get("stale")); self.notice=QLabel("Candidate is stale and must be regenerated." if self.stale else ("Choose an explicit action. No mapping is confirmed automatically." if has_candidates else "No candidate is required to mark this title as not on the server.")); self.notice.setObjectName("profileBanner" if self.stale else "muted"); layout.addWidget(self.notice)
         buttons=QDialogButtonBox(); self.confirm=None; self.reject_candidate=None
         if has_candidates:
@@ -132,6 +148,20 @@ class MatchingReviewDialog(QDialog):
 
     def show_action_error(self,message:str)->None:
         self.notice.setText(message);self.notice.setObjectName("profileBanner");self.notice.style().unpolish(self.notice);self.notice.style().polish(self.notice)
+
+    def _selected_candidate(self):
+        rows=self.candidates.selectionModel().selectedRows()
+        return self._prepared_candidates[rows[0].row()] if rows else None
+
+    def _candidate_selected(self):
+        candidate=self._selected_candidate()
+        if candidate is None:self.details.clear();self.technical_details.clear();return
+        conflict="None" if str(candidate.get("confidence") or "") not in {"CONFLICTING","REJECTED","INSUFFICIENT_EVIDENCE"} else str(candidate.get("confidence")).replace("_"," ").title()
+        self.details.setPlainText("\n".join((f"Suggested target: {candidate_target(candidate)}",f"Parent folder: {candidate.get('display_name') or candidate.get('relative_path') or 'Unknown'}",f"Season scope: {('Season '+format(int(candidate['season_number']),'02d')) if candidate.get('season_number') is not None else 'Not season-scoped'}",f"Confidence: {candidate.get('confidence') or 'Unknown'}",f"Match points: {candidate.get('score') if candidate.get('score') is not None else 'Not available'}",f"Conflict: {conflict}","Evidence:",*(f"- {line}" for line in evidence_lines(candidate)))))
+        self.technical_details.setPlainText(technical_evidence(candidate))
+
+    def _technical_toggled(self,visible:bool):
+        self.technical_details.setVisible(visible)
 
 
 class LegacyImportPreviewDialog(QDialog):

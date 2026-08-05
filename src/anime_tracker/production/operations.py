@@ -12,7 +12,7 @@ from pathlib import Path
 from ..domain.enums import LibraryKind
 from ..normalization import normalize_title
 from ..services.anilist.cache import AniListCache
-from ..services.anilist.cancellation import CancellationToken
+from ..services.anilist.cancellation import Cancellation
 from ..services.anilist.client import AniListGraphQLClient
 from ..services.anilist.service import AniListService
 from ..services.server_inventory.models import LibraryRoot, RootScanStatus, ServerInventorySnapshot
@@ -39,7 +39,7 @@ class ProductionAniListOperations:
     def preview(self,ids=None)->dict:
         requested=tuple(dict.fromkeys(ids or self.active_ids()));return {"requested_ids":requested,"count":len(requested),"deduplicated":True,"archived_excluded":True,"notifications_suppressed":True}
 
-    def refresh(self,ids=None,*,force=False,offline=False,token:CancellationToken|None=None,baseline=True)->dict:
+    def refresh(self,ids=None,*,force=False,offline=False,token:Cancellation|None=None,baseline=True)->dict:
         requested=tuple(dict.fromkeys(ids or self.active_ids()))
         before=self._metadata_fingerprints(requested)
         if offline:

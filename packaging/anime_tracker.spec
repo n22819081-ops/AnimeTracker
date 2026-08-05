@@ -13,7 +13,7 @@ a=Analysis(
     pathex=[str(root/'src')],
     binaries=[],datas=datas,
     hiddenimports=['PySide6.QtNetwork','requests','urllib3','certifi','winotify','sqlite3'],
-    hookspath=[],hooksconfig={},runtime_hooks=[],
+    hookspath=[str(root/'packaging'/'hooks')],hooksconfig={},runtime_hooks=[],
     excludes=['tkinter','pytest','pytestqt','tests','setuptools','pip'],
     noarchive=False,optimize=1,
 )

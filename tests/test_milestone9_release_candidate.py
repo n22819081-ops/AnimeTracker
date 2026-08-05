@@ -115,6 +115,8 @@ def test_diagnostics_and_smoke_test_entry_points(qtbot,tmp_path,capsys):
 def test_packaging_is_windowed_per_user_and_preserves_data():
     root=Path(__file__).parents[1];spec=(root/"packaging"/"anime_tracker.spec").read_text(encoding="utf-8");installer=(root/"packaging"/"AnimeTracker.iss").read_text(encoding="utf-8")
     assert "console=False" in spec and "name='Anime Tracker'" in spec and "PySide6.QtNetwork" in spec
+    hook=(root/"packaging"/"hooks"/"hook-PySide6.QtNetwork.py").read_text(encoding="utf-8")
+    assert "add_qt6_dependencies" in hook and "collect_qtnetwork_files" not in hook
     assert "PrivilegesRequired=lowest" in installer and "DefaultDirName={localappdata}\\Programs\\Anime Tracker" in installer
     assert "scheduled" not in installer.casefold() and "production_profile" not in installer
     assert "UninstallDelete" in installer and "User data" in installer

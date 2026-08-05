@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Callable, Iterable
 from uuid import uuid4
 
-from .cancellation import CancellationToken
+from .cancellation import Cancellation
 from .models import AniListRefreshBatch, AniListRefreshResult, BatchState, RateLimitState
 
 
@@ -15,7 +15,7 @@ def build_refresh_batch(
     *,
     started_at: datetime,
     completed_at: Callable[[], datetime],
-    token: CancellationToken | None = None,
+    token: Cancellation | None = None,
     archived_ids: Iterable[int] = (),
     include_archived: bool = False,
     batch_id: str | None = None,
@@ -25,7 +25,7 @@ def build_refresh_batch(
     eligible = tuple(item for item in unique if include_archived or item not in archived)
     results: list[AniListRefreshResult] = []
     for index, media_id in enumerate(eligible):
-        if token and token.is_canceled:
+        if token and token.is_cancelled():
             now = completed_at()
             results.extend(
                 AniListRefreshResult(

@@ -13,6 +13,7 @@ from .locks import FileOperationLock,OperationAlreadyRunning
 from .operations import ProductionAniListOperations,ProductionInventoryOperations
 from .profile import ProductionProfile
 from ..runtime import APP_VERSION
+from ..services.anilist.cancellation import Cancellation
 
 
 class ScheduledRunStatus(str,Enum):
@@ -28,26 +29,26 @@ class ScheduledCheckRunner:
     def __init__(self,profile:ProductionProfile,*,anilist=None,inventory=None,backup=None,deliver=None)->None:
         self.profile=profile;self.anilist=anilist or ProductionAniListOperations(profile);self.inventory=inventory or ProductionInventoryOperations(profile);self.backup=backup or ModernBackupManager(profile);self.deliver=deliver
 
-    def run(self)->ScheduledRunResult:
+    def run(self,token:Cancellation|None=None)->ScheduledRunResult:
         started=datetime.now(timezone.utc);run_id=f"scheduled-v{APP_VERSION}-{uuid.uuid4().hex}"
         if not self.profile.database_path.is_file():
             result=ScheduledRunResult(run_id,started.isoformat(),datetime.now(timezone.utc).isoformat(),ScheduledRunStatus.FAILED.value,warnings=("The modern production database is not migrated.",));self._write_log(result);return result
         try:
             with FileOperationLock(self.profile.locks_dir/"scheduled-check.lock"):
-                result=self._execute(run_id,started)
+                result=self._execute(run_id,started,token)
         except OperationAlreadyRunning:
             return ScheduledRunResult(run_id,started.isoformat(),datetime.now(timezone.utc).isoformat(),ScheduledRunStatus.ALREADY_RUNNING.value,warnings=("Another scheduled check holds the production lock.",))
         self._record(result);self._write_log(result);return result
 
-    def _execute(self,run_id,started)->ScheduledRunResult:
+    def _execute(self,run_id,started,token=None)->ScheduledRunResult:
         config=self.profile.load_bootstrap();warnings=[];refresh={"succeeded":0,"failed":0,"cache_hits":0,"state":"DISABLED"};inventory_result="DISABLED";events=delivered=retry=failed_delivery=0
         try:self.backup.create("SCHEDULED")
         except Exception as exc:warnings.append(f"Scheduled backup failed: {type(exc).__name__}")
         if config.get("anilist_refresh_enabled"):
-            try:refresh=self.anilist.refresh(baseline=False)
+            try:refresh=self.anilist.refresh(baseline=False,token=token)
             except Exception as exc:refresh={"succeeded":0,"failed":len(self.anilist.active_ids()),"cache_hits":0,"state":"FAILED"};warnings.append(f"AniList refresh failed: {type(exc).__name__}")
         if config.get("jellyfin_scan_enabled"):
-            try:inventory_result=self.inventory.scan(confirmed=True)["status"]
+            try:inventory_result=self.inventory.scan(confirmed=True,token=token)["status"]
             except Exception as exc:inventory_result="FAILED";warnings.append(f"Inventory scan failed: {type(exc).__name__}")
         mapping_result="RETAINED" if inventory_result!="COMPLETE" else "REVIEW_SUGGESTIONS_ONLY"
         delivery_enabled=config.get("notifications_stage",1)>=3 and (config.get("private_notifications_enabled") or config.get("shared_notifications_enabled"))

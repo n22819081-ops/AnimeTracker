@@ -32,8 +32,7 @@ class _CancelAfter:
     def __init__(self, checks):
         self.remaining = checks
 
-    @property
-    def is_canceled(self):
+    def is_cancelled(self):
         self.remaining -= 1
         return self.remaining <= 0
 

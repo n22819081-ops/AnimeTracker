@@ -71,7 +71,8 @@ def test_table_detail_review_franchise_and_coverage_use_resolved_titles(qtbot,tm
     assert rows[0].title in detail_text and "Romaji unknown" not in detail_text
     review=ReviewPage(repo);franchise=FranchisePage(repo);coverage=CoveragePage(repo)
     for widget in (review,franchise,coverage):qtbot.addWidget(widget)
-    assert len(review.rows)==8 and all(row["title"] in review.list.item(i).text() for i,row in enumerate(review.rows))
+    assert len(review.rows)==len(repo.review_rows()) and review.rows
+    assert all(row["title"] in review.list.item(i).text() for i,row in enumerate(review.rows))
     franchise_text=" ".join(franchise.tree.topLevelItem(i).child(j).text(0) for i in range(franchise.tree.topLevelItemCount()) for j in range(franchise.tree.topLevelItem(i).childCount()))
     assert all(row.title in franchise_text for row in rows)
     coverage_titles={coverage.by_anime.topLevelItem(i).text(0) for i in range(coverage.by_anime.topLevelItemCount())}

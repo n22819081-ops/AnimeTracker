@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from .cancellation import CancellationToken
+from .cancellation import Cancellation
 from .client import AniListGraphQLClient
 from .errors import AniListErrorType, AniListServiceError
 from .models import AniListMedia, MediaKind, parse_media
@@ -44,7 +44,7 @@ class AniListSearch:
     def __init__(self, client: AniListGraphQLClient) -> None:
         self.client = client
 
-    def exact_lookup(self, parsed: ParsedSearchInput, token: CancellationToken | None = None) -> AniListMedia:
+    def exact_lookup(self, parsed: ParsedSearchInput, token: Cancellation | None = None) -> AniListMedia:
         query = MEDIA_BY_MAL_ID_QUERY if parsed.kind == "MAL_ID" else MEDIA_BY_ID_QUERY
         key = "malId" if parsed.kind == "MAL_ID" else "id"
         result = self.client.execute(query, {key: int(parsed.value)}, token=token)
@@ -63,7 +63,7 @@ class AniListSearch:
         page: int = 1,
         per_page: int = 20,
         limit: int = 50,
-        token: CancellationToken | None = None,
+        token: Cancellation | None = None,
     ) -> tuple[AniListMedia, ...]:
         if page <= 0 or per_page <= 0 or limit <= 0:
             raise AniListServiceError(AniListErrorType.INVALID_INPUT, "Pagination values must be positive.")

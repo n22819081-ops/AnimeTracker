@@ -3,10 +3,11 @@ from __future__ import annotations
 import traceback
 import uuid
 from dataclasses import dataclass
-from threading import Event
 from typing import Callable
 
 from PySide6.QtCore import QObject, QRunnable, Signal, Slot
+
+from ..services.anilist.cancellation import CancellationToken
 
 
 @dataclass(frozen=True)
@@ -34,12 +35,13 @@ class BackgroundWorker(QRunnable):
         self.args = args
         self.kwargs = kwargs
         self.worker_id = worker_id or f"worker-{uuid.uuid4().hex}"
-        self.cancel_event = Event()
+        self.cancel_token = CancellationToken()
+        self.cancel_event = self.cancel_token
         self.signals = WorkerSignals()
         self.setAutoDelete(False)
 
     def cancel(self) -> None:
-        self.cancel_event.set()
+        self.cancel_token.cancel()
 
     def report(self, current: int, total: int, message: str = "") -> None:
         self.signals.progress.emit(WorkerProgress(self.worker_id, current, total, message))
@@ -49,7 +51,7 @@ class BackgroundWorker(QRunnable):
         self.signals.started.emit(self.worker_id)
         try:
             result = self.operation(*self.args, cancel_event=self.cancel_event, progress=self.report, **self.kwargs)
-            if self.cancel_event.is_set():
+            if self.cancel_token.is_cancelled():
                 self.signals.canceled.emit(self.worker_id)
             else:
                 self.signals.result.emit(result)

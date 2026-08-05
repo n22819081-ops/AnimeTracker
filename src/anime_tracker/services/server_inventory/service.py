@@ -4,10 +4,11 @@ import hashlib
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Protocol
+from typing import Callable
 
 from ...domain.enums import LibraryKind
 from ...path_utils import normalize_windows_path
+from ..anilist.cancellation import Cancellation
 from .models import (
     DiagnosticCode,
     FileClassification,
@@ -29,11 +30,6 @@ from .parser import (
     season_directory_number,
     special_directory_kind,
 )
-
-
-class Cancellation(Protocol):
-    @property
-    def is_canceled(self) -> bool: ...
 
 
 @dataclass
@@ -479,7 +475,7 @@ class FilesystemInventoryService:
 
     @staticmethod
     def _is_canceled(token: Cancellation | None) -> bool:
-        return token is not None and token.is_canceled
+        return token is not None and token.is_cancelled()
 
     @staticmethod
     def _canceled_root(root: LibraryRoot) -> RootInventory:

@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from typing import Mapping
 
-from .cancellation import CancellationToken
+from .cancellation import Cancellation
 from .models import RateLimitState
 
 
@@ -63,7 +63,7 @@ class RetryPolicy:
         return max(MINIMUM_RETRY_DELAY, min(self.maximum_delay_seconds, base + jitter))
 
 
-def cancellable_wait(seconds: float, token: CancellationToken | None, sleep) -> bool:
+def cancellable_wait(seconds: float, token: Cancellation | None, sleep) -> bool:
     if token is not None:
         return token.wait(seconds)
     sleep(seconds)

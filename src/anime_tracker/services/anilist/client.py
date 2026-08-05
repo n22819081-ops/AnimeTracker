@@ -9,7 +9,7 @@ from typing import Any, Mapping
 
 import requests
 
-from .cancellation import CancellationToken
+from .cancellation import Cancellation
 from .errors import AniListErrorType, AniListServiceError
 from .models import RateLimitState
 from .rate_limit import RetryPolicy, cancellable_wait, rate_limit_from_headers
@@ -69,7 +69,7 @@ class AniListGraphQLClient:
         self.last_network_requests = 0
         self.last_rate_limit_pauses = 0
 
-    def _preflight_pause(self, token: CancellationToken | None) -> bool:
+    def _preflight_pause(self, token: Cancellation | None) -> bool:
         state = self.rate_limit_state
         now = self.clock()
         if state.remaining is not None and state.remaining <= 1 and state.reset_at and state.reset_at > now:
@@ -84,10 +84,10 @@ class AniListGraphQLClient:
         query: str,
         variables: Mapping[str, Any],
         *,
-        token: CancellationToken | None = None,
+        token: Cancellation | None = None,
     ) -> GraphQLResult:
         validate_graphql_variables(variables)
-        if token and token.is_canceled:
+        if token and token.is_cancelled():
             raise AniListServiceError(AniListErrorType.CANCELED, "AniList operation was canceled.")
         requests_made = 0
         pauses = 1 if self._preflight_pause(token) else 0
@@ -95,7 +95,7 @@ class AniListGraphQLClient:
         self.last_rate_limit_pauses = pauses
         last_error: AniListServiceError | None = None
         for attempt in range(1, self.retry_policy.maximum_retries + 2):
-            if token and token.is_canceled:
+            if token and token.is_cancelled():
                 raise AniListServiceError(AniListErrorType.CANCELED, "AniList operation was canceled.")
             try:
                 requests_made += 1

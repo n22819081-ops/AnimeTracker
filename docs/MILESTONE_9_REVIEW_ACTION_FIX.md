@@ -63,3 +63,13 @@ The rebuilt packaged executable was assembled successfully. Direct packaged smok
 ## Safety
 
 The production profile database, settings, and bootstrap were unchanged during implementation and acceptance. All live inventory access was read-only and all acceptance writes went to disposable profile copies. Jellyfin media, Discord delivery, Task Scheduler, the legacy database, and the Jellyfin Storage Checker were untouched.
+
+## Refresh and presentation acceptance repair
+
+The packaged Qt worker previously wrapped `threading.Event` in a private `_EventToken` exposing only `is_canceled`. AniList retry/rate-limit code correctly called `wait(timeout)`, so a cache miss or network retry raised `AttributeError`. The shared `Cancellation` protocol now defines `is_cancelled()`, `cancel()`, and interruptible `wait(timeout)`. `CancellationToken` implements it and is passed directly by GUI refresh, Jellyfin scan, and scheduled-check workers; legacy Event-style aliases remain only at the worker callable boundary. Retry and rate-limit waits remain interruptible, completed partial results remain persisted, and worker exceptions still reach the GUI.
+
+The installed final package was exercised against a disposable copy of the 69-title production profile. Refresh All Active completed with 69 checked, 69 succeeded, zero failed, 24 cache hits, 47 network requests, and zero metadata changes. The completion dialog appeared normally and no notification baseline or delivery path was invoked.
+
+Candidate evidence is formatted once into readable lines. Raw JSON is hidden behind an explicit technical-details control, false `absolute_numbering` evidence is omitted, and semantically overlapping warnings are deduplicated. The Dangers in My Heart Season 2 displayed `The Dangers in My Heart (2023) - Season 02`, `STRONG`, and `132` Match points, plus parent-folder, season, episode, and conflict details. No mapping was confirmed.
+
+The review table now has stable interactive widths, elided cells, and a fixed details panel. A 13-candidate automated resize loop performed no repository query and no formatter/model rebuild, completing below the 1.5-second smoke ceiling.

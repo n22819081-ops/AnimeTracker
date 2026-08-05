@@ -239,27 +239,22 @@ def _simulated_operation(steps:int,*,cancel_event,progress):
     return {"canceled":False,"completed":steps}
 
 
-class _EventToken:
-    def __init__(self,event):self.event=event
-    @property
-    def is_canceled(self):return self.event.is_set()
-
-
 def _production_refresh(profile,*,cancel_event,progress):
     from ..production.operations import ProductionAniListOperations
     operation=ProductionAniListOperations(profile);preview=operation.preview();progress(0,preview["count"],f"Preparing {preview['count']} active AniList identities")
-    result=operation.refresh(token=_EventToken(cancel_event),baseline=False);result["completed_at"]=__import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat();progress(result["succeeded"]+result["failed"],preview["count"],f"{result['succeeded']} refreshed, {result['failed']} failed");return result
+    result=operation.refresh(token=cancel_event,baseline=False);result["completed_at"]=__import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat();progress(result["succeeded"]+result["failed"],preview["count"],f"{result['succeeded']} refreshed, {result['failed']} failed");return result
 
 
 def _production_scan(profile,*,cancel_event,progress):
     from ..production.operations import ProductionInventoryOperations
-    progress(0,2,"Scanning TV Library read-only");result=ProductionInventoryOperations(profile).scan(confirmed=True,token=_EventToken(cancel_event));progress(2,2,f"Inventory {result['status'].casefold()}");return result
+    progress(0,2,"Scanning TV Library read-only");result=ProductionInventoryOperations(profile).scan(confirmed=True,token=cancel_event);progress(2,2,f"Inventory {result['status'].casefold()}");return result
 
 
 def _operation_summary(label,result)->str:
     if not isinstance(result,dict):return ""
     if "refresh" in label.casefold():
-        return "\n".join(("AniList refresh complete",f"{result.get('checked',result.get('requested',0))} titles checked",f"{result.get('succeeded',0)} succeeded",f"{result.get('failed',0)} failed",f"{result.get('cache_hits',0)} cache hits",f"{result.get('network_requests',0)} network requests",f"{result.get('metadata_changes',0)} metadata changes"))
+        heading="AniList refresh complete" if not result.get("failed") else "AniList refresh: Partial Success"
+        return "\n".join((heading,f"- {result.get('checked',result.get('requested',0))} titles checked",f"- {result.get('succeeded',0)} succeeded",f"- {result.get('failed',0)} failed",f"- {result.get('cache_hits',0)} cache hits",f"- {result.get('network_requests',0)} network requests",f"- {result.get('metadata_changes',0)} metadata changes"))
     if "inventory scan" in label.casefold():
         stats=result.get("statistics",{})
         return "\n".join(("Jellyfin scan complete",f"{result.get('item_count',0)} library items",f"{stats.get('files_seen',0)} files",f"{stats.get('media_files_seen',0)} media files",f"{result.get('candidate_suggestions',0)} candidate suggestions",f"{result.get('mappings_revalidated',0)} mappings revalidated","0 mappings auto-confirmed",f"{result.get('review_cases',0)} review cases"))
@@ -268,7 +263,7 @@ def _operation_summary(label,result)->str:
 
 def _production_scheduled_check(profile,*,cancel_event,progress):
     from ..production.scheduled import ScheduledCheckRunner
-    progress(0,1,"Running scheduled-check pipeline");result=ScheduledCheckRunner(profile).run();progress(1,1,f"Scheduled check: {result.status}");return result
+    progress(0,1,"Running scheduled-check pipeline");result=ScheduledCheckRunner(profile).run(token=cancel_event);progress(1,1,f"Scheduled check: {result.status}");return result
 
 
 def _production_install_task(profile,settings,*,cancel_event,progress):

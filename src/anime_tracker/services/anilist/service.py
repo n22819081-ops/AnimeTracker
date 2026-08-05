@@ -6,7 +6,7 @@ from typing import Iterable, Mapping
 from ...domain.enums import MediaKind, RelationDirection, RelationType
 from .airing import parse_airing_rows
 from .cache import AniListCache
-from .cancellation import CancellationToken
+from .cancellation import Cancellation
 from .client import AniListGraphQLClient
 from .errors import AniListErrorType, AniListServiceError
 from .models import (
@@ -50,7 +50,7 @@ class AniListService:
         *,
         force_refresh: bool = False,
         offline: bool = False,
-        token: CancellationToken | None = None,
+        token: Cancellation | None = None,
     ) -> AniListRefreshResult:
         started = self.clock()
         if not isinstance(anilist_id, int) or anilist_id <= 0:
@@ -76,7 +76,7 @@ class AniListService:
                 "No usable cached AniList metadata is available offline.", True,
                 started_at=started, completed_at=self.clock(),
             )
-        if token and token.is_canceled:
+        if token and token.is_cancelled():
             return AniListRefreshResult(
                 anilist_id, False, False, False, None, AniListErrorType.CANCELED.value,
                 "AniList operation was canceled.", started_at=started, completed_at=self.clock(), canceled=True,
@@ -119,7 +119,7 @@ class AniListService:
                 rate_limit_pause_count=self.client.last_rate_limit_pauses,
             )
 
-    def refresh_media(self, anilist_id: int, *, token: CancellationToken | None = None) -> AniListRefreshResult:
+    def refresh_media(self, anilist_id: int, *, token: Cancellation | None = None) -> AniListRefreshResult:
         return self.get_media(anilist_id, force_refresh=True, token=token)
 
     def refresh_batch(
@@ -127,7 +127,7 @@ class AniListService:
         anilist_ids: Iterable[int],
         *,
         force_refresh: bool = False,
-        token: CancellationToken | None = None,
+        token: Cancellation | None = None,
         archived_ids: Iterable[int] = (),
         include_archived: bool = False,
         batch_id: str | None = None,
@@ -164,7 +164,7 @@ class AniListService:
         per_page: int = 20,
         limit: int = 50,
         offline: bool = False,
-        token: CancellationToken | None = None,
+        token: Cancellation | None = None,
     ) -> tuple[AniListMedia, ...]:
         parsed = parse_search_input(value)
         if parsed.kind != "TITLE":
@@ -193,7 +193,7 @@ class AniListService:
         *,
         page: int = 1,
         per_page: int = 50,
-        token: CancellationToken | None = None,
+        token: Cancellation | None = None,
     ) -> tuple[AniListMedia, ...]:
         if page <= 0 or per_page <= 0:
             raise AniListServiceError(AniListErrorType.INVALID_INPUT, "Pagination values must be positive.")
@@ -252,7 +252,7 @@ class AniListService:
         start: datetime,
         end: datetime,
         *,
-        token: CancellationToken | None = None,
+        token: Cancellation | None = None,
     ) -> tuple[AniListAiringEpisode, ...]:
         rows = []
         page_number = 1
@@ -277,11 +277,11 @@ class AniListService:
             self.cache.put_airing_schedule(media_id, tuple(values), self.clock())
         return episodes
 
-    def get_upcoming_airings(self, *, days: int = 7, token: CancellationToken | None = None) -> tuple[AniListAiringEpisode, ...]:
+    def get_upcoming_airings(self, *, days: int = 7, token: Cancellation | None = None) -> tuple[AniListAiringEpisode, ...]:
         now = self.clock()
         return self._get_airings(UPCOMING_AIRING_QUERY, now, now + timedelta(days=days), token=token)
 
-    def get_recent_airings(self, *, days: int = 7, token: CancellationToken | None = None) -> tuple[AniListAiringEpisode, ...]:
+    def get_recent_airings(self, *, days: int = 7, token: Cancellation | None = None) -> tuple[AniListAiringEpisode, ...]:
         now = self.clock()
         return self._get_airings(RECENT_AIRING_QUERY, now - timedelta(days=days), now, token=token)
 
