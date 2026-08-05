@@ -15,7 +15,10 @@ from ..services.anilist.cache import AniListCache
 from ..services.anilist.cancellation import Cancellation
 from ..services.anilist.client import AniListGraphQLClient
 from ..services.anilist.service import AniListService
-from ..services.server_inventory.models import LibraryRoot, RootScanStatus, ServerInventorySnapshot
+from ..services.server_inventory.models import (
+    FileClassification, InventoryFile, InventoryLibraryItem, InventorySeason, InventorySpecialGroup,
+    InventoryStatistics, LibraryRoot, RootInventory, RootScanStatus, ServerInventorySnapshot, SpecialKind,
+)
 from ..services.server_inventory.service import FilesystemInventoryService
 from .profile import ProductionProfile
 
@@ -93,6 +96,25 @@ class ProductionInventoryOperations:
         with closing(sqlite3.connect(f"file:{self.profile.database_path.as_posix()}?mode=ro",uri=True)) as connection:
             row=connection.execute("SELECT snapshot_id FROM inventory_snapshots WHERE complete=1 ORDER BY completed_at DESC LIMIT 1").fetchone();return row[0] if row else ""
 
+    def latest_complete_snapshot(self)->ServerInventorySnapshot:
+        with closing(sqlite3.connect(f"file:{self.profile.database_path.as_posix()}?mode=ro",uri=True)) as connection:
+            row=connection.execute("SELECT roots_json,statistics_json,inventory_json FROM inventory_snapshots WHERE complete=1 ORDER BY completed_at DESC LIMIT 1").fetchone()
+        if row is None:raise ValueError("Run a complete read-only Jellyfin scan before confirming a server match.")
+        return _snapshot_from_json(row[0],row[1],row[2])
+
+    def confirm_candidate(self,candidate_id:str,anilist_id:int,*,profile_id:str="default")->dict:
+        from ..services.matching.repository import MatchingRepository
+        from ..services.matching.service import MatchingService
+        snapshot=self.latest_complete_snapshot();now=datetime.now(timezone.utc)
+        media=AniListCache(self.profile.database_path).get_media(anilist_id,now).media
+        if media is None:raise ValueError(f"AniList {anilist_id} is not available in the local cache.")
+        matching=MatchingService(MatchingRepository(self.profile.database_path))
+        mapping=matching.confirm_mapping(candidate_id,media,snapshot,profile_id=profile_id,user_note="Confirmed from Review Server Match.")
+        evaluations=matching.check_confirmed_mappings(media,snapshot,aired_episode_count=_aired_episode_count(media),profile_id=profile_id)
+        self._sync_tracking_state(anilist_id,evaluations,now)
+        evaluation=next((item for item in evaluations if item.mapping.mapping_id==mapping.mapping_id),None)
+        return {"mapping_id":mapping.mapping_id,"target":mapping.target.display_name or mapping.target.relative_path,"season_number":mapping.target.season_number,"server_presence":evaluation.server_presence.value if evaluation else "UNKNOWN_COVERAGE"}
+
     def _persist(self,snapshot_id:str,snapshot:ServerInventorySnapshot,started:datetime,completed:datetime)->None:
         roots=[{"label":root.root.label,"library_kind":root.root.library_kind.value,"status":root.status.value} for root in snapshot.roots]
         diagnostics=[_json_value(item) for root in snapshot.roots for item in root.diagnostics]
@@ -117,7 +139,7 @@ class ProductionInventoryOperations:
                 generated,reviews=matching.prepare_candidates(media,snapshot,relations=media.relations,profile_id="default")
                 existing_types={item.review_type for item in repository.list_reviews("default",anilist_id=anilist_id)}
                 reviews=tuple(review for review in reviews if review.review_type not in existing_types)
-                prepared.append((generated.session,generated.candidates,reviews));media_values.append(media)
+                prepared.append((generated.session,generated.candidates,reviews,anilist_id));media_values.append(media)
                 generated_by_id[anilist_id]=generated
                 count=sum(candidate.confidence in viable for candidate in generated.candidates)
                 suggestions+=count;titles_with_suggestions+=int(count>0)
@@ -195,3 +217,22 @@ def _json_value(value):
     if isinstance(value,(tuple,list)):return [_json_value(item) for item in value]
     if isinstance(value,dict):return {str(key):_json_value(item) for key,item in value.items()}
     return value
+
+
+def _snapshot_from_json(roots_json:str,statistics_json:str,inventory_json:str)->ServerInventorySnapshot:
+    def file_value(value):
+        return InventoryFile(
+            value["path"],value["relative_path"],value["normalized_path"],value.get("size"),value.get("modified_ns"),
+            FileClassification(value["classification"]),value.get("season_number"),tuple(value.get("episode_numbers") or ()),
+            SpecialKind(value["special_kind"]) if value.get("special_kind") else None,tuple(value.get("absolute_episode_numbers") or ()),
+        )
+    def item_value(value):
+        return InventoryLibraryItem(
+            value["item_id"],value["root_label"],LibraryKind(value["library_kind"]),value["path"],value["normalized_path"],value["title"],value.get("year"),
+            tuple(InventorySeason(item["season_number"],item["path"],tuple(file_value(entry) for entry in item.get("files") or ())) for item in value.get("seasons") or ()),
+            tuple(InventorySpecialGroup(SpecialKind(item["kind"]),item["path"],tuple(file_value(entry) for entry in item.get("files") or ())) for item in value.get("specials") or ()),
+            tuple(file_value(entry) for entry in value.get("movie_files") or ()),tuple(file_value(entry) for entry in value.get("unrecognized_media") or ()),
+        )
+    root_values=json.loads(roots_json or "[]");items=tuple(item_value(value) for value in json.loads(inventory_json or "[]"));statistics=json.loads(statistics_json or "{}")
+    roots=tuple(RootInventory(LibraryRoot(value["label"],"",LibraryKind(value["library_kind"])),RootScanStatus(value["status"]),tuple(item for item in items if item.root_label==value["label"])) for value in root_values)
+    return ServerInventorySnapshot(roots,InventoryStatistics(**{key:int(statistics.get(key,0)) for key in InventoryStatistics.__dataclass_fields__}))

@@ -64,6 +64,14 @@ The rebuilt packaged executable was assembled successfully. Direct packaged smok
 
 The production profile database, settings, and bootstrap were unchanged during implementation and acceptance. All live inventory access was read-only and all acceptance writes went to disposable profile copies. Jellyfin media, Discord delivery, Task Scheduler, the legacy database, and the Jellyfin Storage Checker were untouched.
 
+## Explicit confirmation follow-up
+
+The first repair connected candidate-free decisions but left Confirm Suggestion as a dialog-only accept button. The anime detail actions Review Server Match and View Franchise were also enabled without signal handlers. These controls now dispatch explicit controller actions; no candidate is auto-selected or auto-confirmed by a scan.
+
+Confirmation rehydrates the latest persisted complete inventory snapshot and verifies that its matching identity is unchanged before writing the selected mapping. It then recalculates coverage and tracker state in the active profile. Candidate generations now mark older candidates stale per AniList identity while retaining their history, preventing duplicate prior-session suggestions from being treated as current.
+
+The By server folder coverage view now comes from the latest persisted inventory snapshot. Unmapped folders remain visible, season directories are summarized, and multiple AniList seasons may still map to one parent show folder with separate season scopes. Refresh All updates AniList metadata only; discovering files added to Jellyfin requires Scan Jellyfin Libraries, which remains read-only.
+
 ## Refresh and presentation acceptance repair
 
 The packaged Qt worker previously wrapped `threading.Event` in a private `_EventToken` exposing only `is_canceled`. AniList retry/rate-limit code correctly called `wait(timeout)`, so a cache miss or network retry raised `AttributeError`. The shared `Cancellation` protocol now defines `is_cancelled()`, `cancel()`, and interruptible `wait(timeout)`. `CancellationToken` implements it and is passed directly by GUI refresh, Jellyfin scan, and scheduled-check workers; legacy Event-style aliases remain only at the worker callable boundary. Retry and rate-limit waits remain interruptible, completed partial results remain persisted, and worker exceptions still reach the GUI.

@@ -108,8 +108,12 @@ class MatchingRepository:
     def save_generation_batch(self,values)->None:
         """Persist prepared sessions, candidates, and reviews in one thread-owned transaction."""
         with self.connect() as connection:
-            for session,candidates,reviews in values:
+            for value in values:
+                session,candidates,reviews=value[:3]
+                anilist_id=value[3] if len(value)>3 else (candidates[0].anilist_id if candidates else (reviews[0].anilist_id if reviews else None))
                 self._save_session(connection,session)
+                if anilist_id is not None:
+                    connection.execute("UPDATE server_match_candidates SET stale=1 WHERE profile_id=? AND anilist_id=? AND session_id<>? AND stale=0",(session.profile_id,anilist_id,session.session_id))
                 self._save_candidates(connection,candidates)
                 for review in reviews:
                     self._save_review(connection,review)

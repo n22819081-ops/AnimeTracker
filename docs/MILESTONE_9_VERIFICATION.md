@@ -2,7 +2,7 @@
 
 Version/build: `1.0.0` / `1.0.0-rc1`; schema 6. PyInstaller 6.21.0 produced a windowed 223-file onedir build with version/icon resources and Qt platform, image, style, network, Schannel TLS, SQLite, Python OpenSSL, requests, DPAPI, and notification dependencies. Inno Setup 6.7.3 compiled the per-user installer. The portable ZIP contains 223 valid members.
 
-`pytest`: **688 passed, 0 failed in 45.78s**. Disposable source-runtime validation passed for clean schema, configurable read-only Jellyfin roots, diagnostics, all 12 pages, scheduled SUCCESS/partial/offline/lock states, backup/restore, explicit adoption/source retention, candidate-free review actions, active-profile isolation, live snapshot persistence, candidate regeneration, review reconciliation, cancellation/backoff, cover-request cancellation, evidence presentation, resize performance, native-Python installer selection, hostile-PATH Qt TLS isolation, and the production-profile copy. Notification delivery stayed Stage 1.
+`pytest`: **694 passed, 47 subtests passed, 0 failed in 49.38s**. Disposable source-runtime validation passed for clean schema, configurable read-only Jellyfin roots, diagnostics, all 12 pages, scheduled SUCCESS/partial/offline/lock states, backup/restore, explicit adoption/source retention, candidate-free review actions, explicit candidate confirmation, active-profile isolation, live snapshot persistence, candidate regeneration, review reconciliation, cancellation/backoff, cover-request cancellation, evidence presentation, resize performance, native-Python installer selection, hostile-PATH Qt TLS isolation, and the production-profile copy. Notification delivery stayed Stage 1.
 
 ## Existing-profile detection acceptance fix
 
@@ -19,6 +19,14 @@ The review dialog's Mark Not on Server button was not connected to any applicati
 Production scanning previously ended after persisting `inventory_snapshots`. It now generates and persists candidates, reapplies rejections/manual decisions, revalidates confirmed mappings, stores coverage, reconciles migrated reviews, updates page models, and displays real summaries. The full disposable live-root run completed in 6.67 seconds with 587 items, 12,335 files, 10,843 media files, 13 suggestions across 12 titles, one mapping revalidated, zero auto-confirmations, and zero integration failures. Two obsolete ambiguity reviews with no current candidate were superseded; genuine legacy mapping reviews remained.
 
 See `MILESTONE_9_REVIEW_ACTION_FIX.md` for affected tables, lifecycle details, and acceptance evidence.
+
+## Explicit mapping actions and coverage repair
+
+Three production controls rendered normally but had no controller connection: Confirm Suggestion, Review Server Match in anime details, and View Franchise. Confirm Suggestion now passes the exact selected candidate ID and AniList ID to a production operation, reconstructs the latest complete persisted inventory snapshot, validates the cached AniList identity, confirms the season-scoped mapping, recalculates coverage, updates tracker state, refreshes every page, and surfaces failures without closing the review. Reject Candidate now persists a candidate rejection through the same active-profile guard.
+
+Finished titles with a current candidate can open a synthetic explicit-review context even when an obsolete migrated review says no match was found. This exposed Bakemonogatari's existing `Bakemonogatari (2009) - Season 01` suggestion instead of requiring a new scan. The Coverage page now uses known AniList episode counts for expected/aired values and lists all 587 folders from the latest complete inventory snapshot in By server folder, not only confirmed mappings.
+
+Disposable-profile acceptance confirmed The Dangers in My Heart Season 2 to Season 02, Bakemonogatari to Season 01, and Beautiful Bones to Season 01. All three produced complete coverage, `On Server` tracker state, and no remaining open review in the disposable copy. Installed-GUI acceptance opened both Dangers and Bakemonogatari review dialogs and displayed the full server-folder inventory; both dialogs were canceled without writing production mappings. The production database SHA-256 remained `27DB6560CCDF4736E0004CD75673337344A9631CA462135C5E348CD30D595B06`.
 
 ## Refresh and matching presentation repair
 

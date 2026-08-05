@@ -54,7 +54,7 @@ class MatchingService:
             media,inventory,relations=relations,profile_id=profile_id,session_id=session_id,
             franchise_identity=franchise_identity,archived=archived,
         )
-        self.repository.save_generation_batch(((result.session,result.candidates,reviews),))
+        self.repository.save_generation_batch(((result.session,result.candidates,reviews,media.anilist_id),))
         return result
 
     def prepare_candidates(

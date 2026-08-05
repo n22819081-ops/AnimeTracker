@@ -120,7 +120,8 @@ class ModernRepository:
                        m.evidence_summary_json,
                        cv.server_presence calculated_presence,cv.coverage_json,
                        suggestion.display_name suggestion_name,suggestion.relative_path suggestion_path,
-                       suggestion.confidence suggestion_confidence,suggestion.score suggestion_score
+                       suggestion.confidence suggestion_confidence,suggestion.score suggestion_score,
+                       suggestion.target_type suggestion_target_type,suggestion.season_number suggestion_season
                   FROM tracked_media tm
                   JOIN anilist_media am ON am.anilist_id=tm.anilist_id
                   LEFT JOIN anilist_media_cache ac ON ac.anilist_id=tm.anilist_id
@@ -240,6 +241,59 @@ class ModernRepository:
             result.append(value)
         return tuple(result)
 
+    def review_for_anime(self, anilist_id: int) -> dict | None:
+        reviews=tuple(row for row in self.review_rows() if int(row["anilist_id"])==int(anilist_id))
+        review=next((row for row in reviews if row.get("candidates")),reviews[0] if reviews else None)
+        candidates=self._current_candidates(anilist_id)
+        if review is not None:
+            value=dict(review)
+            if not value.get("candidates"):value["candidates"]=candidates
+            return value
+        row=next((item for item in self.tracked_media() if item.anilist_id==int(anilist_id)),None)
+        if row is None or not candidates:return None
+        return {"review_id":"","profile_id":"default","anilist_id":row.anilist_id,"title":row.title,"media_format":row.media_format,"season_name":row.season,"season_year":row.year,"tracker_status":row.tracker_status,"server_status":row.server_status,"review_type":"CANDIDATE_SUGGESTION","reason":"A Jellyfin candidate is available for explicit confirmation.","current_mapping":row.mapping_label if row.mapping_state in {"Confirmed","Broken"} else "","candidates":candidates}
+
+    def _current_candidates(self,anilist_id:int)->tuple[dict,...]:
+        with self.connect() as connection:
+            rows=connection.execute("""
+                SELECT * FROM (
+                    SELECT c.*,ROW_NUMBER() OVER(PARTITION BY c.target_identity_key ORDER BY s.started_at DESC,c.score DESC,c.candidate_id) candidate_rank
+                      FROM server_match_candidates c JOIN matching_sessions s ON s.session_id=c.session_id
+                     WHERE c.profile_id='default' AND c.anilist_id=? AND c.stale=0
+                       AND c.confidence IN ('VERY_STRONG','STRONG','POSSIBLE')
+                       AND NOT EXISTS (SELECT 1 FROM mapping_overrides decision WHERE decision.profile_id=c.profile_id AND decision.anilist_id=c.anilist_id AND decision.active=1 AND decision.decision_type IN ('NOT_ON_SERVER','NO_VALID_CANDIDATE'))
+                ) WHERE candidate_rank=1 ORDER BY score DESC,candidate_id
+            """,(anilist_id,)).fetchall()
+        return tuple(dict(row) for row in rows)
+
+    def server_folder_rows(self)->tuple[dict,...]:
+        try:
+            with self.connect() as connection:
+                snapshot=connection.execute("SELECT inventory_json FROM inventory_snapshots WHERE complete=1 ORDER BY completed_at DESC LIMIT 1").fetchone()
+                mappings=connection.execute(_TITLE_CTE+"""
+                    SELECT m.inventory_item_id,m.normalized_path,m.target_type,m.season_number,
+                           COALESCE(t.english,t.romaji,t.native,'AniList '||m.anilist_id) title
+                      FROM media_server_mappings m LEFT JOIN titles t ON t.anilist_id=m.anilist_id
+                     WHERE m.active=1 ORDER BY title,m.mapping_id
+                """).fetchall()
+        except sqlite3.OperationalError as exc:
+            if "no such table" in str(exc).casefold():
+                return ()
+            raise
+        if snapshot is None:return ()
+        by_item={};by_path={}
+        for mapping in mappings:
+            value=dict(mapping)
+            if mapping["inventory_item_id"]:by_item.setdefault(mapping["inventory_item_id"],[]).append(value)
+            if mapping["normalized_path"]:by_path.setdefault(mapping["normalized_path"],[]).append(value)
+        result=[]
+        for item in json.loads(snapshot[0] or "[]"):
+            linked=by_item.get(item.get("item_id"),()) or by_path.get(item.get("normalized_path"),())
+            seasons=tuple(sorted(int(value["season_number"]) for value in item.get("seasons") or () if value.get("season_number") is not None))
+            scopes=tuple(f"Season {int(value['season_number']):02d}" if value.get("season_number") is not None else str(value.get("target_type") or "Unspecified").replace("_"," ").title() for value in linked)
+            result.append({"display_name":item.get("title") or "Unnamed server folder","seasons":", ".join(f"Season {value:02d}" for value in seasons) or "None detected","mapped_titles":", ".join(value["title"] for value in linked) or "Not mapped","mapping_scopes":", ".join(scopes) or "Not mapped","unmapped":"No" if linked else "Yes","ambiguous_files":len(item.get("unrecognized_media") or ())})
+        return tuple(result)
+
     def history_rows(self) -> tuple[dict, ...]:
         with self.connect() as connection:
             rows = connection.execute(_TITLE_CTE + """
@@ -313,6 +367,7 @@ class ModernRepository:
             mapping_state="Broken" if row["path_state"]=="MISSING" else "Confirmed"
         elif row["suggestion_name"]:
             mapping_label=f"Suggestion available: {row['suggestion_name']} ({row['suggestion_confidence']}, {row['suggestion_score']})"
+            if row["suggestion_season"] is not None:mapping_label+=f" · Season {row['suggestion_season']:02d}"
             mapping_state="Suggestion available"
         evidence={}
         try:evidence=json.loads(row["evidence_summary_json"] or "{}")
@@ -327,6 +382,10 @@ class ModernRepository:
         raw_presence=row["calculated_presence"] or row["server_presence"] or "NOT_FOUND"
         server_presence={"ON_SERVER":"COMPLETE","NEEDS_REVIEW":"PATH_MISSING"}.get(raw_presence,raw_presence)
         relation_label="\n".join(f"{item.relation_type.replace('_',' ').title()}: {item.title} (AniList {item.target_anilist_id})" for item in relations)
+        expected=coverage.get("expected_total_episodes") or evidence.get("expected_episode_count") or row["episode_count"] or cached.get("episodes")
+        aired=coverage.get("aired_episode_count",evidence.get("aired_episode_count"))
+        if aired is None and (row["anilist_status"] or cached.get("status"))=="FINISHED":aired=expected
+        elif aired is None and next_airing.get("episode") is not None:aired=max(0,int(next_airing["episode"])-1)
         return AnimeRow(
             row["anilist_id"],title,romaji,native,row["media_format"] or cached.get("format") or "UNKNOWN",
             row["season_name"] or cached.get("season") or "",row["season_year"] or cached.get("seasonYear"),
@@ -336,6 +395,6 @@ class ModernRepository:
             row["source_updated_at"] or "",row["cover_image_url"] or cached_cover.get("extraLarge") or cached_cover.get("large") or cached_cover.get("medium") or "",
             mapping_label,relation_label,bool(row["archived_at"]),english,synonyms,row["episode_count"] or cached.get("episodes"),
             str(next_airing.get("airingAt") or ""),row["page_url"] or cached.get("siteUrl") or "",row["review_reason"] or "",relations,
-            coverage.get("expected_total_episodes") or evidence.get("expected_episode_count") or row["episode_count"] or cached.get("episodes"),coverage.get("aired_episode_count",evidence.get("aired_episode_count")),
+            expected,aired,
             len(coverage.get("present_episode_numbers",())) if coverage.get("present_episode_numbers") is not None else evidence.get("present_episode_count"),missing,mapping_state,
         )

@@ -69,7 +69,7 @@ class MainWindow(QMainWindow):
     def _create_pages(self):
         rows=lambda:self.repository.tracked_media()
         pages={
-            "Dashboard":DashboardPage(self.repository),
+            "Dashboard":DashboardPage(self.repository,production=self.production),
             "Upcoming":AnimeListPage("Upcoming",self.repository,lambda r:r.tracker_status=="Upcoming",filter_options={"All":lambda r:True,"This year":lambda r:r.year is not None,"No release year":lambda r:r.year is None}),
             "Currently Airing":AnimeListPage("Currently Airing",self.repository,lambda r:r.tracker_status=="Currently Airing","Airing schedule times display locally; cached timestamps remain UTC.",{
                 "All":lambda r:True,"Missing aired episodes":lambda r:r.server_status=="PARTIAL","Complete so far":lambda r:r.coverage in {"CURRENT_COMPLETE","COMPLETE"},"Airing this week":lambda r:bool(r.next_airing_at),"No schedule":lambda r:not r.next_airing_at,"Refresh failed":lambda r:not r.last_updated,"On server":lambda r:r.server_status=="COMPLETE","Not on server":lambda r:r.server_status in {"NOT_ON_SERVER","NOT_FOUND"},
@@ -84,7 +84,7 @@ class MainWindow(QMainWindow):
             "Needs Review":ReviewPage(self.repository),
             "Franchises":FranchisePage(self.repository),
             "Jellyfin Coverage":CoveragePage(self.repository),
-            "Notifications":NotificationsPage(self.repository),
+            "Notifications":NotificationsPage(self.repository,production=self.production),
             "History":HistoryPage(self.repository),
             "Settings":SettingsPage(self.settings,production=self.production,diagnostics=self._diagnostics()),
         }
@@ -160,18 +160,55 @@ class MainWindow(QMainWindow):
     def open_add(self):
         provider=_production_search_provider(self.profile) if self.production else None
         AddAnimeDialog(search_provider=provider,parent=self,background_search=self.production).exec()
-    def open_detail(self,row):AnimeDetailDialog(row,self,details=self.repository.media_details(row.anilist_id)).exec()
+    def open_detail(self,row):
+        dialog=AnimeDetailDialog(row,self,details=self.repository.media_details(row.anilist_id))
+        dialog.review_server_match_requested.connect(lambda value:self._review_from_detail(dialog,value))
+        dialog.view_franchise_requested.connect(lambda value:self._franchise_from_detail(dialog,value))
+        dialog.exec()
+
+    def _review_from_detail(self,dialog,row):
+        dialog.accept();review=self.repository.review_for_anime(row.anilist_id)
+        if review is None:
+            QMessageBox.information(self,"No server suggestion","No current Jellyfin candidate is available for this title. Run a read-only Jellyfin scan after adding it to the server.");return
+        self.open_review(review)
+
+    def _franchise_from_detail(self,dialog,row):
+        dialog.accept();self.navigation.setCurrentRow(PAGE_LABELS.index("Franchises"));self.search.setText(row.title)
+
     def open_review(self,review):
-        dialog=MatchingReviewDialog(review,self);dialog.mark_not_on_server_requested.connect(lambda value:self._mark_review_not_on_server(value,dialog));dialog.suppress_auto_match_requested.connect(lambda value:self._suppress_review_matching(value,dialog));dialog.exec()
+        dialog=MatchingReviewDialog(review,self);dialog.mark_not_on_server_requested.connect(lambda value:self._mark_review_not_on_server(value,dialog));dialog.suppress_auto_match_requested.connect(lambda value:self._suppress_review_matching(value,dialog));dialog.confirm_candidate_requested.connect(lambda value,candidate:self._confirm_review_candidate(value,candidate,dialog));dialog.reject_candidate_requested.connect(lambda value,candidate:self._reject_review_candidate(value,candidate,dialog));dialog.exec()
+
+    def _confirm_review_candidate(self,review,candidate,dialog):
+        if dialog.confirm:dialog.confirm.setEnabled(False)
+        try:
+            self._assert_active_profile()
+            from ..production.operations import ProductionInventoryOperations
+            result=ProductionInventoryOperations(self.profile).confirm_candidate(str(candidate["candidate_id"]),int(review["anilist_id"]),profile_id=str(review.get("profile_id") or "default"))
+        except Exception as exc:
+            LOGGER.exception("Candidate confirmation failed for AniList %s",review.get("anilist_id"));dialog.show_action_error(f"Confirmation failed: {exc}");QMessageBox.warning(dialog,"Mapping not confirmed",f"The server match could not be confirmed.\n\n{exc}")
+            if dialog.confirm:dialog.confirm.setEnabled(True)
+            return
+        self._refresh_pages();dialog.accept();season=f" · Season {result['season_number']:02d}" if result.get("season_number") is not None else "";QMessageBox.information(self,"Server match confirmed",f"{result.get('target') or 'Jellyfin target'}{season}\n\nServer presence: {result.get('server_presence','Unknown').replace('_',' ').title()}")
+
+    def _reject_review_candidate(self,review,candidate,dialog):
+        try:
+            self._assert_active_profile()
+            from ..services.matching.models import MatchingRejectionScope
+            from ..services.matching.repository import MatchingRepository
+            from ..services.matching.service import MatchingService
+            MatchingService(MatchingRepository(self.profile.database_path)).reject_candidate(str(candidate["candidate_id"]),MatchingRejectionScope.CANDIDATE,profile_id=str(review.get("profile_id") or "default"),reason="Rejected from Review Server Match.")
+        except Exception as exc:
+            LOGGER.exception("Candidate rejection failed for AniList %s",review.get("anilist_id"));dialog.show_action_error(f"Rejection failed: {exc}");QMessageBox.warning(dialog,"Candidate not rejected",f"The candidate could not be rejected.\n\n{exc}");return
+        self._refresh_pages();dialog.accept();QMessageBox.information(self,"Candidate rejected","The rejection was saved. A later read-only scan will keep this target rejected.")
 
     def _mark_review_not_on_server(self,review,dialog):
         try:
             self._assert_active_profile()
             from ..services.matching.repository import MatchingRepository
             from ..services.matching.service import MatchingService
-            MatchingService(MatchingRepository(self.profile.database_path)).resolve_review_not_on_server(
-                str(review["review_id"]),int(review["anilist_id"]),profile_id=str(review.get("profile_id") or "default"),
-            )
+            service=MatchingService(MatchingRepository(self.profile.database_path))
+            if review.get("review_id"):service.resolve_review_not_on_server(str(review["review_id"]),int(review["anilist_id"]),profile_id=str(review.get("profile_id") or "default"))
+            else:service.mark_not_on_server(int(review["anilist_id"]),profile_id=str(review.get("profile_id") or "default"),reason="Manually confirmed not on the Jellyfin server.")
         except Exception as exc:
             LOGGER.exception("Mark Not on Server failed for AniList %s",review.get("anilist_id"));dialog.show_action_error(f"Mark Not on Server failed: {exc}");QMessageBox.warning(dialog,"Decision not saved",f"The decision could not be saved.\n\n{exc}");return
         self._refresh_pages();dialog.accept()

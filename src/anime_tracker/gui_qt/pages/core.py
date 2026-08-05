@@ -26,10 +26,10 @@ class Page(QWidget):
 
 
 class DashboardPage(Page):
-    def __init__(self, repository: ModernRepository):
-        super().__init__("Dashboard","Current tracker health from the disposable modern profile.")
+    def __init__(self, repository: ModernRepository, *, production: bool = False):
+        super().__init__("Dashboard","Current tracker health from the active production profile." if production else "Current tracker health from the disposable modern profile.")
         self.repository=repository; self.grid=QGridLayout(); self.layout.addLayout(self.grid)
-        self.warning=QLabel("Cached development data is shown. Network refresh and server scans do not run automatically.")
+        self.warning=QLabel("Production data is shown. AniList refresh and read-only Jellyfin scans run only when requested." if production else "Cached development data is shown. Network refresh and server scans do not run automatically.")
         self.warning.setObjectName("profileBanner"); self.layout.addWidget(self.warning)
         self.events=QListWidget(); self.events.setAccessibleName("Recent important events")
         self.layout.addWidget(QLabel("Recent important events")); self.layout.addWidget(self.events,1)
@@ -120,8 +120,9 @@ class CoveragePage(Page):
             scope=(f"Season {row.mapping_label.rsplit('Season ',1)[-1]}" if "Season " in row.mapping_label else ("Movie" if row.media_format=="MOVIE" else "Unspecified"))
             coverage="Not evaluated" if row.mapping_state in {"Not mapped","Suggestion available"} else ("Unknown" if row.coverage=="UNKNOWN" else row.coverage.replace("_"," ").title())
             self.by_anime.addTopLevelItem(QTreeWidgetItem([row.title,scope,str(row.expected_episodes or "Unknown"),str(row.aired_episodes if row.aired_episodes is not None else "Unknown"),str(row.present_episodes if row.present_episodes is not None else "Unknown"),", ".join(map(str,row.missing_episodes)) or "None known",coverage,row.mapping_state,row.mapping_label]))
-            if row.mapping_state in {"Confirmed","Broken"}:self.by_folder.addTopLevelItem(QTreeWidgetItem([row.mapping_label,scope,row.title,row.mapping_label,"None recorded","None recorded" if not row.review_reason else row.review_reason]))
             if row.server_status=="PARTIAL":self.missing.addTopLevelItem(QTreeWidgetItem([row.title,", ".join(map(str,row.missing_episodes)) or "Episode evidence unavailable",row.mapping_label]))
+        for folder in self.repo.server_folder_rows():
+            self.by_folder.addTopLevelItem(QTreeWidgetItem([folder["display_name"],folder["seasons"],folder["mapped_titles"],folder["mapping_scopes"],folder["unmapped"],str(folder["ambiguous_files"])]))
     def set_search(self,text):
         query=text.casefold().strip()
         for tree in (self.by_anime,self.by_folder,self.missing):
@@ -155,8 +156,8 @@ class ReviewPage(Page):
 
 
 class NotificationsPage(Page):
-    def __init__(self,repo):
-        super().__init__("Notifications","Test-profile outbox only. Credential values are never displayed and production delivery is disabled."); self.repo=repo
+    def __init__(self,repo,*,production:bool=False):
+        super().__init__("Notifications","Notification state for the active production profile. Credential values are never displayed." if production else "Test-profile outbox only. Credential values are never displayed and production delivery is disabled."); self.repo=repo
         self.tabs=QTabWidget(); self.tables={}
         for status in ("PENDING","RETRY_WAIT","DELIVERED","FAILED_PERMANENT","SUPPRESSED","CANCELED"):
             table=QTableWidget(0,7); table.setHorizontalHeaderLabels(["Event","Anime","Channel","Created","Status","Attempts","Last error"]); self.tables[status]=table; self.tabs.addTab(table,status.replace("_"," ").title())

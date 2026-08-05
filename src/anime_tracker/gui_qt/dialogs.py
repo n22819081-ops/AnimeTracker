@@ -5,7 +5,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QThreadPool, Signal
 from PySide6.QtWidgets import (
-    QAbstractItemView,
+    QAbstractItemView, QApplication,
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGridLayout, QGroupBox, QHBoxLayout,
     QHeaderView, QLabel, QLineEdit, QListWidget, QMessageBox, QPushButton, QSpinBox, QTabWidget,
     QTableWidget, QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget,
@@ -84,6 +84,9 @@ class AddAnimeDialog(QDialog):
 
 
 class AnimeDetailDialog(QDialog):
+    review_server_match_requested = Signal(object)
+    view_franchise_requested = Signal(object)
+
     def __init__(self,row:AnimeRow,parent=None,*,details=None):
         super().__init__(parent); self.row=row;self.details=details or {}; self.setWindowTitle(row.title); self.resize(760,660)
         layout=QVBoxLayout(self); top=QHBoxLayout(); self.cover=QLabel(); self.cover.setFixedSize(150,210); self.cover.setAlignment(Qt.AlignCenter); self.cover.setObjectName("panel")
@@ -97,10 +100,13 @@ class AnimeDetailDialog(QDialog):
         for name,text in (("Relations",row.relation_label or "No cached relations"),("Mapping History",_detail_lines(history,"No mapping or tracker history")),("Rejections",_detail_lines(self.details.get("rejections",()),"No rejected matches")),("Review Cases",_detail_lines(self.details.get("reviews",()),row.review_reason or row.review or "No open review")),("Notifications",_detail_lines(self.details.get("notification_preferences",()),"No per-title suppression; channel preferences remain independent"))):
             widget=QTextEdit(text); widget.setReadOnly(True); tabs.addTab(widget,name)
         layout.addWidget(tabs,1)
-        actions=QGridLayout()
+        actions=QGridLayout();self.action_buttons={}
         action_labels=("Refresh AniList","View Franchise","Review Server Match","Mark Not on Server","Suppress Auto-Match","Restore Auto-Match","Archive","Restore","Open AniList Page","Copy Title","Show Full Path","Export Diagnostics")
         for index,label in enumerate(action_labels):
-            button=QPushButton(label); button.setEnabled(label in {"Copy Title","View Franchise","Review Server Match"}); actions.addWidget(button,index//4,index%4)
+            button=QPushButton(label); button.setEnabled(label in {"Copy Title","View Franchise","Review Server Match"});self.action_buttons[label]=button;actions.addWidget(button,index//4,index%4)
+        self.action_buttons["Review Server Match"].clicked.connect(lambda:self.review_server_match_requested.emit(self.row))
+        self.action_buttons["View Franchise"].clicked.connect(lambda:self.view_franchise_requested.emit(self.row))
+        self.action_buttons["Copy Title"].clicked.connect(lambda:QApplication.clipboard().setText(self.row.title))
         layout.addLayout(actions); close=QDialogButtonBox(QDialogButtonBox.Close); close.rejected.connect(self.reject); layout.addWidget(close)
 
     def _cover_loaded(self,url,pixmap):
@@ -113,6 +119,8 @@ class AnimeDetailDialog(QDialog):
 class MatchingReviewDialog(QDialog):
     mark_not_on_server_requested = Signal(dict)
     suppress_auto_match_requested = Signal(dict)
+    confirm_candidate_requested = Signal(dict,dict)
+    reject_candidate_requested = Signal(dict,dict)
 
     def __init__(self,review:dict,parent=None):
         super().__init__(parent); self.review=review; self.setWindowTitle("Review Server Match"); self.resize(980,680); self._prepared_candidates=tuple(review.get("candidates",()))
@@ -141,7 +149,8 @@ class MatchingReviewDialog(QDialog):
         self.stale=bool(review.get("stale")); self.notice=QLabel("Candidate is stale and must be regenerated." if self.stale else ("Choose an explicit action. No mapping is confirmed automatically." if has_candidates else "No candidate is required to mark this title as not on the server.")); self.notice.setObjectName("profileBanner" if self.stale else "muted"); layout.addWidget(self.notice)
         buttons=QDialogButtonBox(); self.confirm=None; self.reject_candidate=None
         if has_candidates:
-            self.confirm=buttons.addButton("Confirm Suggestion",QDialogButtonBox.AcceptRole); self.confirm.setEnabled(not self.stale); self.reject_candidate=buttons.addButton("Reject Candidate",QDialogButtonBox.DestructiveRole)
+            self.confirm=buttons.addButton("Confirm Suggestion",QDialogButtonBox.ActionRole); self.confirm.setEnabled(not self.stale); self.reject_candidate=buttons.addButton("Reject Candidate",QDialogButtonBox.DestructiveRole)
+            self.confirm.clicked.connect(self._confirm_selected);self.reject_candidate.clicked.connect(self._reject_selected)
         self.choose_folder=buttons.addButton("Choose Folder Manually",QDialogButtonBox.ActionRole); self.choose_folder.setEnabled(False); self.choose_folder.setToolTip("Manual folder selection is not available in this packaged build.")
         self.mark_not_on_server=buttons.addButton("Mark Not on Server",QDialogButtonBox.ActionRole); self.suppress_auto_match=buttons.addButton("Suppress Automatic Matching",QDialogButtonBox.ActionRole); buttons.addButton(QDialogButtonBox.Cancel)
         self.mark_not_on_server.clicked.connect(lambda:self.mark_not_on_server_requested.emit(self.review)); self.suppress_auto_match.clicked.connect(lambda:self.suppress_auto_match_requested.emit(self.review)); buttons.accepted.connect(self.accept); buttons.rejected.connect(self.reject); layout.addWidget(buttons)
@@ -152,6 +161,14 @@ class MatchingReviewDialog(QDialog):
     def _selected_candidate(self):
         rows=self.candidates.selectionModel().selectedRows()
         return self._prepared_candidates[rows[0].row()] if rows else None
+
+    def _confirm_selected(self):
+        candidate=self._selected_candidate()
+        if candidate is not None and not self.stale:self.confirm_candidate_requested.emit(self.review,candidate)
+
+    def _reject_selected(self):
+        candidate=self._selected_candidate()
+        if candidate is not None:self.reject_candidate_requested.emit(self.review,candidate)
 
     def _candidate_selected(self):
         candidate=self._selected_candidate()
