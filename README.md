@@ -106,12 +106,14 @@ Each Discord message uses an embed with titles, previous/new status, episode cou
 
 ## Jellyfin Paths
 
-Default paths:
+Default paths (configure to your own media layout):
 
-- `I:\Jellyfin_Media\TV-SHOWs`
-- `I:\Jellyfin_Media\Movies`
+- `\<YOUR_MEDIA_DRIVE>\TV-SHOWs`
+- `\<YOUR_MEDIA_DRIVE>\Movies`
 
 You can edit paths in the app with `Settings`.
+
+> **Status:** currently broken — see `docs/` for the cutover/verification notes.
 
 ## Usage
 
