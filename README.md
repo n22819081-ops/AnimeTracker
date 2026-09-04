@@ -113,7 +113,7 @@ Default paths (configure to your own media layout):
 
 You can edit paths in the app with `Settings`.
 
-> **Status:** currently broken — see `docs/` for the cutover/verification notes.
+> **Status:** the **Legacy** app is the most working right now. **Modern** has some issues tracking shows — see `docs/` for the cutover/verification notes.
 
 ## Usage
 
