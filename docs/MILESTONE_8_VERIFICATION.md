@@ -12,8 +12,8 @@ Final result: 633 passed, 0 failed, 0 skipped, and 47 subtests passed in 35.40 s
 
 ## Production Results
 
-- Profile: `C:\AnimeTracker\production_profile`
-- Pre-cutover backup: `C:\AnimeTracker\modernization_backups\20260802-062240-pre-production-cutover`
+- Profile: `C:\AnimeTracker\Modern Anime Tracker\production_profile`
+- Pre-cutover backup: `C:\AnimeTracker\Modern Anime Tracker\modernization_backups\20260802-062240-pre-production-cutover`
 - Milestone 7 source bundle SHA-256: `DB0A16DADB5BA168FBB1BC79D7F26855A492583DD0655A75EE23AF1A9441BD49`
 - Legacy database pre/post SHA-256: `52D2F8D5E1365A655CDB915A6357822EEF21D8D226797A0EE791D03491D4B2A7`
 - State: `MIGRATED_PENDING_CUTOVER`
@@ -38,7 +38,7 @@ The legacy task remains Ready. No production Discord send, Task Scheduler change
 User acceptance exposed a case mismatch between lowercase `media_titles.title_type` values and uppercase GUI repository predicates. The correction is documented in `MILESTONE_8_ACCEPTANCE_FIXES.md` and `PRODUCTION_METADATA_BINDING.md`.
 
 - Required pre-fix production database SHA-256: `2636A1088980CF4C939660401BF3A7FB0EB61E15060227293204CAA7777ED148`
-- Verified backup: `production_profile/backups/20260802-072013-pre-m8-acceptance-fix`
+- Verified backup: `Modern Anime Tracker/production_profile/backups/20260802-072013-pre-m8-acceptance-fix`
 - Backup database SHA-256: `7534430EB5AD6B391807F5D2C56844DFF38636C38F72A62CE22D926D4F3AD825`
 - Post-backup-audit database SHA-256: `686BE777398D98800DB468ABB7BFA4553323850292A8F69794A8256341A9A181`
 - Integrity and active/archived/baseline counts remained `ok` and 69/421/1,312.

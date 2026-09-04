@@ -23,7 +23,7 @@ from anime_tracker.production.profile import ProductionProfile
 
 
 ROOT = Path(__file__).parents[1]
-PRODUCTION = ROOT / "production_profile"
+PRODUCTION = ROOT / "Modern Anime Tracker" / "production_profile"
 
 
 def _production_copy(tmp_path: Path) -> ProductionProfile:

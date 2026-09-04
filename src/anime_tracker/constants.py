@@ -4,10 +4,11 @@ from pathlib import Path
 
 APP_NAME = "Anime Tracker"
 BASE_DIR = Path(__file__).resolve().parents[2]
-DATA_DIR = BASE_DIR / "data"
+LEGACY_DIR = BASE_DIR / "Legacy Anime Tracker"
+DATA_DIR = LEGACY_DIR / "data"
 DB_PATH = DATA_DIR / "anime_tracker.db"
-LOG_DIR = BASE_DIR / "logs"
-BACKUP_DIR = BASE_DIR / "backups"
+LOG_DIR = LEGACY_DIR / "logs"
+BACKUP_DIR = LEGACY_DIR / "backups"
 
 DEFAULT_TV_PATH = r"I:\Jellyfin_Media\TV-SHOWs"
 DEFAULT_MOVIE_PATH = r"I:\Jellyfin_Media\Movies"

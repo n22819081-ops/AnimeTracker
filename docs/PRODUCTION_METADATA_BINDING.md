@@ -3,7 +3,7 @@
 ## Read Path
 
 ```text
-production_profile/data/anime_tracker_modern.db
+Modern Anime Tracker/production_profile/data/anime_tracker_modern.db
   -> anilist_media_cache (normalized provider payload)
   -> anilist_media + media_titles (canonical persisted metadata)
   -> tracked_media + tracking_state + media_server_mappings

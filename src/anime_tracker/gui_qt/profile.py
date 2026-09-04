@@ -7,9 +7,10 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
-LIVE_DATABASE = ROOT / "data" / "anime_tracker.db"
-DEFAULT_PROFILE = ROOT / "modern_profile_test"
-PROTOTYPE_DATABASE = ROOT / "migration_test" / "anime_tracker_modern_v5.db"
+LIVE_DATABASE = ROOT / "Legacy Anime Tracker" / "data" / "anime_tracker.db"
+MODERN_ROOT = ROOT / "Modern Anime Tracker"
+DEFAULT_PROFILE = MODERN_ROOT / "modern_profile_test"
+PROTOTYPE_DATABASE = MODERN_ROOT / "migration_test" / "anime_tracker_modern_v5.db"
 
 
 @dataclass(frozen=True)

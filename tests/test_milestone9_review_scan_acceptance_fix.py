@@ -48,7 +48,7 @@ def test_no_candidate_dialog_hides_blank_candidate_fields_and_connects_action(qt
     assert dialog.empty_candidate_message is not None
     assert "No Jellyfin candidate was found" in dialog.empty_candidate_message.text()
     assert dialog.confirm is None and dialog.reject_candidate is None
-    assert dialog.mark_not_on_server.isEnabled() and not dialog.choose_folder.isEnabled()
+    assert dialog.mark_not_on_server.isEnabled() and dialog.choose_folder.isEnabled()
     dialog.mark_not_on_server.click()
     assert emitted==[review]
 

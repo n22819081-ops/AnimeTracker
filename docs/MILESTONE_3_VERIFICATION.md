@@ -28,7 +28,7 @@ All normal AniList tests used injected fake HTTP sessions and sanitized fixtures
 
 - Source v1 prototype SHA-256: `239B0F263068E317C13B71541BD67C8DA6F2C2C8385CD45A6D326AB5DB1CB014`
 - Source v1 prototype unchanged: yes
-- Ignored v3 copy: `C:\AnimeTracker\migration_test\anime_tracker_modern_v3.db`
+- Ignored v3 copy: `C:\AnimeTracker\Modern Anime Tracker\migration_test\anime_tracker_modern_v3.db`
 - V3 copy SHA-256: `7C05914D44B38A3972A75A205D9441CD1E8D94656BB7FC2829D83F9BF72EB5BC`
 - Recorded versions: 1, 2, 3
 - Integrity: `ok`

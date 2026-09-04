@@ -28,6 +28,25 @@ def _emit_json(value:dict,path:Path|None=None)->None:
     if sys.stdout is not None:print(rendered)
 
 
+def _setup_file_logging(profile_path:Path|str)->None:
+    """Route all logging to <profile>/logs/modern_app.log so a windowed (silent)
+    launch is still diagnosable. Idempotent; never blocks or raises."""
+    import logging
+    log_dir=Path(profile_path)/"logs"
+    try:
+        log_dir.mkdir(parents=True,exist_ok=True)
+        handler=logging.FileHandler(log_dir/"modern_app.log",encoding="utf-8")
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+        root=logging.getLogger()
+        if not any(getattr(h,"_at_file_marker",False) for h in root.handlers):
+            handler._at_file_marker=True
+            root.addHandler(handler)
+            if root.level==0 or root.level==logging.WARNING:
+                root.setLevel(logging.INFO)
+    except OSError:
+        pass
+
+
 def create_application(profile_path:str|Path=DEFAULT_PROFILE)->tuple[QApplication,MainWindow]:
     app=QApplication.instance() or QApplication(sys.argv);_configure_application(app)
     profile=ModernProfile(Path(profile_path));profile.initialize();window=MainWindow(profile,ModernRepository(profile.database_path));return app,window
@@ -47,6 +66,7 @@ def main(argv=None)->int:
     args=parser.parse_args(argv)
     if args.offscreen:os.environ.setdefault("QT_QPA_PLATFORM","offscreen")
     profile_path=validate_profile_override(Path(args.profile)) if args.profile else default_profile_root()
+    _setup_file_logging(profile_path)
     if args.scheduled_check:
         from ..production.scheduled_command import main as scheduled_main
         return scheduled_main(["--profile",str(profile_path)])

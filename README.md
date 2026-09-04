@@ -4,7 +4,7 @@ Anime Tracker is a local Windows desktop application for tracking AniList anime 
 
 The normal release entry point is `Anime Tracker.exe`. Mutable data is stored per user under `%LOCALAPPDATA%\Anime Tracker\AnimeTracker`, outside the installed or portable application directory. Discord delivery and scheduling are disabled until explicitly configured.
 
-See [Installation](docs/INSTALLATION.md), [First Run](docs/FIRST_RUN_GUIDE.md), [Quick Start](docs/QUICK_START.md), and [Release Notes](docs/RELEASE_NOTES_1.0.0.md). Development launchers remain for source work but are not needed by the packaged release.
+See [Installation](docs/INSTALLATION.md), [First Run](docs/FIRST_RUN_GUIDE.md), [Quick Start](docs/QUICK_START.md), and [Release Notes](docs/RELEASE_NOTES_1.0.0.md). Development launchers remain for source work but are not needed by the packaged release. Legacy launchers and data are grouped under `Legacy Anime Tracker`; Modern launchers, profiles, packaging, and release artifacts are grouped under `Modern Anime Tracker`. Shared source, tests, dependencies, and documentation remain at the repository root.
 
 Anime Tracker is a local Windows desktop app for tracking anime you want to add to a Jellyfin server. It uses AniList public GraphQL queries for metadata and stores local tracking state in SQLite.
 
@@ -12,7 +12,7 @@ Anime Tracker is a local Windows desktop app for tracking anime you want to add 
 
 Modernization Milestones 1 through 8 establish verified backups, reconciled copy-only migration, typed domain/status rules, live cache-first AniList and read-only inventory services, season-scoped matching, secure DPAPI credential references, a transactional notification outbox, and a PySide6 production profile. Final cutover, Discord activation, and Task Scheduler registration remain explicitly pending.
 
-Milestone documentation is under `docs/`. The disposable prototype is created under ignored `migration_test/`, and the immutable checkpoint is under ignored `modernization_backups/`.
+Milestone documentation is under `docs/`. The disposable prototype is under ignored `Modern Anime Tracker/migration_test/`, and the immutable checkpoint is under ignored `Modern Anime Tracker/modernization_backups/`.
 
 The separate `jellyfin storage checker` is a different product. It is excluded from Git and modernization and must not be invoked or modified by Anime Tracker.
 
@@ -37,7 +37,7 @@ This creates a local virtual environment and installs Python dependencies.
 ## Run
 
 ```powershell
-.\Run-AnimeTracker.ps1
+& ".\Legacy Anime Tracker\Run-AnimeTracker.ps1"
 ```
 
 Or directly:
@@ -49,7 +49,7 @@ Or directly:
 ### Modern Production GUI
 
 ```powershell
-.\Run-AnimeTracker-Modern.ps1
+& ".\Modern Anime Tracker\Run-AnimeTracker-Modern.ps1"
 ```
 
 Or directly:
@@ -58,18 +58,18 @@ Or directly:
 .\.venv\Scripts\python.exe -m anime_tracker.gui_qt.application
 ```
 
-The default launcher opens `production_profile`. The migrated profile is currently marked `MIGRATED_PENDING_CUTOVER`; it does not activate Discord or replace the legacy task automatically.
+The default launcher opens `Modern Anime Tracker\production_profile`. The migrated profile is currently marked `MIGRATED_PENDING_CUTOVER`; it does not activate Discord or replace the legacy task automatically.
 
 Launch the disposable development profile with:
 
 ```powershell
-.\Run-AnimeTracker-Modern.ps1 --test-profile
+& ".\Modern Anime Tracker\Run-AnimeTracker-Modern.ps1" --test-profile
 ```
 
 Reset only that disposable profile with:
 
 ```powershell
-.\Run-AnimeTracker-Modern.ps1 --test-profile --reset-test-profile
+& ".\Modern Anime Tracker\Run-AnimeTracker-Modern.ps1" --test-profile --reset-test-profile
 ```
 
 The broad `--reset-profile` option was removed. Production reset and restore require verified backups and explicit confirmation.
@@ -77,7 +77,7 @@ The broad `--reset-profile` option was removed. Production reset and restore req
 ## Scheduled Daily Check
 
 ```powershell
-.\Create-ScheduledTask.ps1
+& ".\Legacy Anime Tracker\Create-ScheduledTask.ps1"
 ```
 
 The scheduled task runs once daily, silently refreshes AniList status, scans Jellyfin folders, and sends notifications only when meaningful changes occur.
@@ -87,7 +87,7 @@ The scheduled task runs once daily, silently refreshes AniList status, scans Jel
 Open `Settings` to configure notifications.
 
 - Discord notifications are the primary notification method.
-- The Discord webhook URL is stored in `data/notification_config.json`.
+- The legacy Discord webhook URL is stored in `Legacy Anime Tracker/data/notification_config.json`.
 - That local config file is excluded by `.gitignore`.
 - After the webhook is saved, the app only shows `Saved (hidden)` and does not display the full URL again.
 - Windows toast notifications can be enabled as an optional secondary method.

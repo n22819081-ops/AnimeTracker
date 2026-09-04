@@ -65,7 +65,7 @@ Source and test compilation passed with `python -m compileall -q src tests`.
 - No Discord webhook or Windows notification was called.
 - No Task Scheduler command or task change occurred.
 - All 8 Storage Checker files match the verified backup manifest; mismatches: 0. Storage Checker was not invoked or modified.
-- The pre-change rollback bundle is `modernization_backups\20260802-milestone5-prechange\milestone4-checkpoint.bundle`, SHA-256 `A498353FCFA58318F54F35270DA66B1373D2DE991338F07FB61F11BD5584299E`.
+- The pre-change rollback bundle is `Modern Anime Tracker\modernization_backups\20260802-milestone5-prechange\milestone4-checkpoint.bundle`, SHA-256 `A498353FCFA58318F54F35270DA66B1373D2DE991338F07FB61F11BD5584299E`.
 
 ## Known Limitations
 

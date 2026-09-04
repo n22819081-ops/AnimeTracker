@@ -9,7 +9,7 @@ TASK_NAME = "Anime Tracker Weekly Check"
 
 
 def build_scheduled_task_args(project_root: Path, settings: dict[str, str], executable: str = "powershell") -> list[str]:
-    script = project_root / "Create-ScheduledTask.ps1"
+    script = project_root / "Legacy Anime Tracker" / "Create-ScheduledTask.ps1"
     args = [
         executable,
         "-NoProfile",
@@ -34,7 +34,7 @@ def build_scheduled_task_args(project_root: Path, settings: dict[str, str], exec
 
 
 def build_script_arguments(project_root: Path, settings: dict[str, str]) -> list[str]:
-    script = project_root / "Create-ScheduledTask.ps1"
+    script = project_root / "Legacy Anime Tracker" / "Create-ScheduledTask.ps1"
     args = [
         "-NoProfile",
         "-ExecutionPolicy",

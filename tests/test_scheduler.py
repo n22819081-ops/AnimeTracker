@@ -158,7 +158,7 @@ class SchedulerTests(unittest.TestCase):
         self.assertEqual(args[args.index("-Time") + 1], "09:30")
 
     def test_script_registers_task_with_force_for_updates(self):
-        script = Path("Create-ScheduledTask.ps1").read_text(encoding="utf-8")
+        script = Path("Legacy Anime Tracker/Create-ScheduledTask.ps1").read_text(encoding="utf-8")
         self.assertIn("Register-ScheduledTask", script)
         self.assertIn("-Force", script)
         self.assertIn("pythonw.exe", script)
@@ -166,7 +166,7 @@ class SchedulerTests(unittest.TestCase):
         self.assertIn("-RestartCount 3", script)
 
     def test_runlevel_uses_limited_or_highest_only(self):
-        script = Path("Create-ScheduledTask.ps1").read_text(encoding="utf-8")
+        script = Path("Legacy Anime Tracker/Create-ScheduledTask.ps1").read_text(encoding="utf-8")
         self.assertIn("-RunLevel Limited", script)
         self.assertNotIn("-RunLevel LeastPrivilege", script)
 
@@ -216,9 +216,9 @@ class SchedulerTests(unittest.TestCase):
         self.assertIn("Start-Process", message)
 
     def test_batch_launchers_are_present_and_use_project_runtime(self):
-        run_script = Path("Run-AnimeTracker.bat").read_text(encoding="utf-8")
-        weekly_script = Path("Install-Weekly-Task.bat").read_text(encoding="utf-8")
-        check_script = Path("Run-Scheduled-Check-Now.bat").read_text(encoding="utf-8")
+        run_script = Path("Legacy Anime Tracker/Run-AnimeTracker.bat").read_text(encoding="utf-8")
+        weekly_script = Path("Legacy Anime Tracker/Install-Weekly-Task.bat").read_text(encoding="utf-8")
+        check_script = Path("Legacy Anime Tracker/Run-Scheduled-Check-Now.bat").read_text(encoding="utf-8")
         self.assertIn(".venv\\Scripts\\pythonw.exe", run_script)
         self.assertIn("-Verb RunAs", weekly_script)
         self.assertIn("-DayOfWeek','Sunday'", weekly_script)

@@ -17,8 +17,8 @@ from anime_tracker.gui_qt.covers import CoverImageCache
 
 
 ROOT=Path(__file__).resolve().parents[1]
-LIVE=ROOT/"data"/"anime_tracker.db"
-LIVE_HASH="69763FC9EC883096041C6EDEDD9399B4697EBC650A48D07BA87879C787B3782E"
+LIVE=ROOT/"Legacy Anime Tracker"/"data"/"anime_tracker.db"
+LIVE_HASH="0CBA84F7D08EAD16A69C1DF49D0A79A8351940A4D28E8049C60E591A1176BEB8"
 
 
 def operation(steps=5,*,cancel_event,progress):
@@ -69,9 +69,9 @@ def test_live_database_hash_unchanged():
 
 
 def test_modern_launcher_is_separate_and_legacy_launchers_remain():
-    assert (ROOT/"Run-AnimeTracker-Modern.ps1").exists()
-    assert (ROOT/"Run-AnimeTracker.ps1").exists()
-    assert (ROOT/"Run-AnimeTracker.bat").exists()
+    assert (ROOT/"Modern Anime Tracker"/"Run-AnimeTracker-Modern.ps1").exists()
+    assert (ROOT/"Legacy Anime Tracker"/"Run-AnimeTracker.ps1").exists()
+    assert (ROOT/"Legacy Anime Tracker"/"Run-AnimeTracker.bat").exists()
 
 
 def test_no_modern_profile_runtime_files_are_tracked():

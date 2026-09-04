@@ -1,6 +1,6 @@
 # Production Profile Design
 
-Mutable modern data is isolated under `C:\AnimeTracker\production_profile`:
+Mutable modern data is isolated under `C:\AnimeTracker\Modern Anime Tracker\production_profile`:
 
 - `data\anime_tracker_modern.db`: schema-v6 modern database
 - `data\credentials`: per-secret Windows DPAPI blobs after explicit migration

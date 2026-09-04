@@ -9,7 +9,7 @@ from ..runtime import APP_VERSION, default_profile_root, validate_profile_overri
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_PRODUCTION_PROFILE = default_profile_root()
-LIVE_LEGACY_DATABASE = ROOT / "data" / "anime_tracker.db"
+LIVE_LEGACY_DATABASE = ROOT / "Legacy Anime Tracker" / "data" / "anime_tracker.db"
 
 
 def default_bootstrap() -> dict:

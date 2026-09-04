@@ -18,9 +18,15 @@ from .profile import LIVE_LEGACY_DATABASE, ProductionProfile
 from .schema import migrate_to_production_schema
 
 
-EXPECTED_ACTIVE = 69
-EXPECTED_ARCHIVED = 421
-EXPECTED_BASELINES = 1312
+# The old frozen counts (EXPECTED_ACTIVE=69 / EXPECTED_ARCHIVED=421 /
+# EXPECTED_BASELINES=1312) were a stale fingerprint of the Aug 2 snapshot. They are
+# gone on purpose: a re-migration of current Legacy (73 active) could never match a
+# frozen 69, so the gate was self-sabotaging. Integrity is now guaranteed by the
+# migration AUDIT (reconciliation "unexplained_loss_tables": source_count ==
+# active + archived + excluded for every table), plus integrity_check, foreign_key_check
+# and the raw-webhook scan. The fresh-migration path additionally validates against
+# its OWN reconciliation destination_counts (passed via `expected`), which is the
+# strongest check available.
 
 
 class ProductionMigrationError(RuntimeError): pass
@@ -89,9 +95,13 @@ def _validate_database(path: Path, reconciliation: dict) -> dict:
         }
         raw_settings="\n".join(str(row[0]) for row in connection.execute("SELECT value FROM application_settings"))
         raw_credentials="\n".join(str(row[0]) for row in connection.execute("SELECT credential_identifier FROM credential_references"))
-    if counts["active_titles"]!=EXPECTED_ACTIVE: errors.append(f"active title count is {counts['active_titles']}, expected {EXPECTED_ACTIVE}")
-    if counts["archived_orphans"]!=EXPECTED_ARCHIVED: errors.append(f"archived count is {counts['archived_orphans']}, expected {EXPECTED_ARCHIVED}")
-    if counts["shared_baselines"]!=EXPECTED_BASELINES: errors.append(f"baseline count is {counts['shared_baselines']}, expected {EXPECTED_BASELINES}")
+    # The frozen count comparisons (active/archived/baselines vs a hardcoded snapshot)
+    # are gone: they were a stale Aug 2 fingerprint and self-sabotaged any re-migration.
+    # What remains is the real integrity contract:
+    #   * integrity_check == ok
+    #   * no foreign-key violations
+    #   * no raw webhook URL leaked into SQLite
+    #   * migration audit balanced (no unexplained loss in any table)
     if counts["foreign_key_violations"]: errors.append("foreign key violations exist")
     if reconciliation.get("unexplained_loss_tables"): errors.append("migration audit has unexplained loss")
     if "discord.com/api/webhooks" in (raw_settings+raw_credentials).casefold(): errors.append("raw webhook found in SQLite")

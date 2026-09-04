@@ -29,7 +29,7 @@ nextAiringEpisode { id episode airingAt timeUntilAiring }
 relations {
   edges {
     relationType
-    node { id format status title { romaji english native } }
+    node { id format status season seasonYear episodes title { romaji english native } }
   }
 }
 """

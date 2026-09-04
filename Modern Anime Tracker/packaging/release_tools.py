@@ -13,6 +13,7 @@ from anime_tracker.runtime import APP_VERSION,BUILD_IDENTIFIER,SCHEMA_VERSION
 
 
 ROOT=Path(__file__).resolve().parents[1]
+PROJECT_ROOT=ROOT.parent
 DIST=ROOT/"dist"/"Anime Tracker"
 RELEASE=ROOT/"release"/APP_VERSION
 APP_EXE=DIST/"Anime Tracker.exe"
@@ -55,11 +56,11 @@ def release_manifest(*,tests:str,clean_environment:str,defender:dict,installer_r
 
 def stage_public_documents()->None:
     mapping={"QUICK_START.md":"QUICK_START.md","RELEASE_NOTES_1.0.0.md":"RELEASE_NOTES_1.0.0.md","RELEASE_MANIFEST_1.0.0.md":"RELEASE_MANIFEST_1.0.0.md","RELEASE_MANIFEST_1.0.0.json":"RELEASE_MANIFEST_1.0.0.json","THIRD_PARTY_NOTICES.md":"THIRD_PARTY_NOTICES.md"}
-    for source,destination in mapping.items():shutil.copy2(ROOT/"docs"/source,RELEASE/destination)
+    for source,destination in mapping.items():shutil.copy2(PROJECT_ROOT/"docs"/source,RELEASE/destination)
 
 
 def write_release_manifest(value:dict)->None:
-    json_path=ROOT/"docs"/f"RELEASE_MANIFEST_{APP_VERSION}.json";markdown_path=ROOT/"docs"/f"RELEASE_MANIFEST_{APP_VERSION}.md"
+    json_path=PROJECT_ROOT/"docs"/f"RELEASE_MANIFEST_{APP_VERSION}.json";markdown_path=PROJECT_ROOT/"docs"/f"RELEASE_MANIFEST_{APP_VERSION}.md"
     json_path.write_text(json.dumps(value,indent=2)+"\n",encoding="utf-8")
     markdown=(f"# Anime Tracker {APP_VERSION} Release Manifest\n\n"
         f"Build `{value['build_identifier']}` dated {value['build_date']}; schema {value['schema_version']}; unsigned.\n\n"

@@ -54,7 +54,13 @@ from .notifications import Notifier
 from .path_utils import normalize_windows_path
 from .review import build_review_state
 from .scheduler import ScheduledCheckStats, record_schedule_install, run_scheduled_check
-from .scanner import confirmed_match_has_evidence, infer_tracked_seasons, match_record, scan_roots
+from .scanner import (
+    confirmed_match_has_evidence,
+    infer_tracked_seasons,
+    match_record,
+    multi_season_ids,
+    scan_roots,
+)
 from .status import is_meaningful_transition, notification_key, tracker_status_from_anilist
 from .task_scheduler import (
     build_elevated_scheduled_task_args,
@@ -412,6 +418,7 @@ class AnimeTrackerApp:
         candidates = scan_roots(settings.get("tv_path", ""), settings.get("movie_path", ""))
         rows = self.db.rows()
         season_numbers = infer_tracked_seasons(rows)
+        multi_ids = multi_season_ids(rows)
         found = 0
         uncertain = 0
         for row in rows:
@@ -452,7 +459,7 @@ class AnimeTrackerApp:
                         self.db.mark_event_sent(key, "server-missing", row["anilist_id"])
                     uncertain += 1
                     continue
-            result = match_record(row, candidates, rejected_paths, season_number)
+            result = match_record(row, candidates, rejected_paths, season_number, multi_ids)
             self.db.save_match_candidates(row["anilist_id"], result.candidates)
             if result.confidence == "confident":
                 previous_status = row["tracker_status"]
@@ -835,6 +842,33 @@ class AnimeTrackerApp:
             self.db.export_csv(Path(path), self.rows)
             messagebox.showinfo(APP_NAME, f"Exported to {path}")
 
+    def check_anilist_status(self) -> None:
+        """Run a manual AniList API health check without freezing the UI."""
+        if getattr(self, "_anilist_check_active", False):
+            return
+        self._anilist_check_active = True
+        self._anilist_check_button.config(state="disabled")
+        self._anilist_status_label.config(text="● Checking...", fg=palette(self.theme_choice)["muted"])
+        threading.Thread(target=self._anilist_status_worker, daemon=True).start()
+
+    def _anilist_status_worker(self) -> None:
+        try:
+            online, detail = self.client.health_check(timeout=8.0)
+        except Exception as exc:
+            online, detail = False, f"Unexpected error: {exc}"
+        self.root.after(0, self._finish_anilist_status_check, online, detail)
+
+    def _finish_anilist_status_check(self, online: bool, detail: str) -> None:
+        if online:
+            text, color = "● Online", "#2fbf71"
+        else:
+            text, color = "● Offline", "#e5534b"
+        self._anilist_status_label.config(text=text, fg=color)
+        self._anilist_check_button.config(state="normal")
+        self._anilist_check_active = False
+        state = "Online" if online else "Offline"
+        self.show_message(APP_NAME, f"AniList API is {state}: {detail}")
+
     def edit_settings(self) -> None:
         config = load_notification_config()
         settings = self.db.get_settings()
@@ -916,6 +950,16 @@ class AnimeTrackerApp:
             Button(maintenance, text=label, command=self._command_for_action(action)).grid(row=index // 2, column=index % 2, sticky="ew", padx=6, pady=4)
         maintenance.grid_columnconfigure(0, weight=1)
         maintenance.grid_columnconfigure(1, weight=1)
+
+        api_status_row = maintenance_row + 1
+        api_status = ttk.LabelFrame(general, text="AniList API Status")
+        api_status.grid(row=api_status_row, column=0, columnspan=2, sticky="ew", padx=8, pady=(10, 4))
+        theme_colors = palette(self.theme_choice)
+        self._anilist_status_label = Label(api_status, text="● Not checked", fg=theme_colors["muted"], bg=theme_colors["bg"])
+        self._anilist_status_label.grid(row=0, column=0, sticky="w", padx=8, pady=6)
+        self._anilist_check_button = Button(api_status, text="Check Status", command=self.check_anilist_status)
+        self._anilist_check_button.grid(row=0, column=1, padx=8, pady=6)
+        Label(api_status, text="Manual check only — never polls AniList automatically.", fg=theme_colors["muted"], bg=theme_colors["bg"]).grid(row=1, column=0, columnspan=2, sticky="w", padx=8, pady=(0, 4))
 
         Checkbutton(announcements, text="Enable shared Discord announcements", variable=toggles["shared_announcements_enabled"]).grid(row=0, column=0, columnspan=2, sticky="w", padx=12, pady=(14, 6))
         Label(announcements, text=f"Shared Discord webhook URL: {masked_webhook(config.shared_discord_webhook_url)}").grid(row=1, column=0, sticky="w", padx=12, pady=6)
@@ -1371,6 +1415,7 @@ def silent_check() -> ScheduledCheckStats:
     candidates = scan_roots(settings.get("tv_path", ""), settings.get("movie_path", ""))
     rows = db.rows()
     season_numbers = infer_tracked_seasons(rows)
+    multi_ids = multi_season_ids(rows)
     for row in rows:
         season_number = season_numbers.get(row["anilist_id"])
         rejected_paths = db.rejected_paths_for(row["anilist_id"])
@@ -1406,7 +1451,7 @@ def silent_check() -> ScheduledCheckStats:
                     )
                     db.mark_event_sent(key, "server-missing", row["anilist_id"])
                 continue
-        result = match_record(row, candidates, rejected_paths, season_number)
+        result = match_record(row, candidates, rejected_paths, season_number, multi_ids)
         db.save_match_candidates(row["anilist_id"], result.candidates)
         if result.confidence == "confident":
             previous_status = row["tracker_status"]

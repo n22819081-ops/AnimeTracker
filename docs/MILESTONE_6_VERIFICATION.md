@@ -52,7 +52,7 @@ Compilation passed with `python -m compileall -q src tests`. Notification-specif
 - Normal automated tests sent no Discord or Windows notification.
 - No Task Scheduler command or change occurred.
 - All eight Storage Checker files matched the verified manifest; Storage Checker was not invoked or modified.
-- Rollback bundle: `modernization_backups\20260802-milestone6-prechange\milestone5-checkpoint.bundle`, SHA-256 `C4976F5F99DB3EC3C6D4CB23E5E156454AA1209952BF98741C3A0D6D3D4A836A`.
+- Rollback bundle: `Modern Anime Tracker\modernization_backups\20260802-milestone6-prechange\milestone5-checkpoint.bundle`, SHA-256 `C4976F5F99DB3EC3C6D4CB23E5E156454AA1209952BF98741C3A0D6D3D4A836A`.
 
 ## Known Limitations
 

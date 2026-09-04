@@ -11,6 +11,7 @@ from .models import AniListMedia, MediaKind, parse_media
 from .queries import MEDIA_BY_ID_QUERY, MEDIA_BY_MAL_ID_QUERY, MEDIA_SEARCH_QUERY
 
 ANILIST_URL_PATTERN = re.compile(r"^https?://(?:www\.)?anilist\.co/anime/(\d+)(?:/[^?#]*)?(?:[?#].*)?$", re.IGNORECASE)
+ANILIST_MANGA_URL_PATTERN = re.compile(r"^https?://(?:www\.)?anilist\.co/manga/\d+(?:/[^?#]*)?(?:[?#].*)?$", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -30,6 +31,11 @@ def parse_search_input(value: str | int) -> ParsedSearchInput:
     match = ANILIST_URL_PATTERN.match(text)
     if match:
         return ParsedSearchInput("ANILIST_ID", int(match.group(1)))
+    if ANILIST_MANGA_URL_PATTERN.match(text):
+        raise AniListServiceError(
+            AniListErrorType.INVALID_INPUT,
+            "Anime Tracker supports AniList anime entries; manga URLs cannot be added.",
+        )
     if text.isdigit():
         return ParsedSearchInput("ANILIST_ID", int(text))
     mal_match = re.fullmatch(r"(?:mal|myanimelist)\s*[:#]?\s*(\d+)", text, re.IGNORECASE)
@@ -75,10 +81,13 @@ class AniListSearch:
                 "search": title,
                 "page": current_page,
                 "perPage": min(per_page, 50),
-                "year": year,
-                "format": media_format.value if media_format else None,
-                "season": season.upper() if season else None,
             }
+            if year is not None:
+                variables["year"] = year
+            if media_format is not None:
+                variables["format"] = media_format.value
+            if season:
+                variables["season"] = season.upper()
             response = self.client.execute(MEDIA_SEARCH_QUERY, variables, token=token)
             page_data = response.data.get("Page") or {}
             media_rows = page_data.get("media") or []

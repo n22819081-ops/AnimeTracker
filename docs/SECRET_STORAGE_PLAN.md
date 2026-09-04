@@ -2,7 +2,7 @@
 
 ## Current State
 
-Two Discord webhook URLs are stored in plaintext `data/notification_config.json`. The file is hidden by the GUI and ignored by Git, but Windows ACL behavior means `chmod(0600)` is not sufficient protection. No webhook values were copied into reports, Git, logs, the prototype database, or ordinary modern settings.
+Two Discord webhook URLs are stored in plaintext `Legacy Anime Tracker/data/notification_config.json`. The file is hidden by the GUI and ignored by Git, but Windows ACL behavior means `chmod(0600)` is not sufficient protection. No webhook values were copied into reports, Git, logs, the prototype database, or ordinary modern settings.
 
 ## Target Design
 

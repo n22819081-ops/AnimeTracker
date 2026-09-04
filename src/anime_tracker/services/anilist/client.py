@@ -145,6 +145,11 @@ class AniListGraphQLClient:
 
     def _response_error(self, response: Any) -> AniListServiceError | None:
         status = int(response.status_code)
+        if status==403:
+            try:payload=response.json();errors=payload.get("errors") if isinstance(payload,Mapping) else None
+            except (TypeError,ValueError,AttributeError):errors=None
+            messages=" ".join(str(item.get("message") or "") for item in (errors or ()) if isinstance(item,Mapping)).casefold()
+            if "temporarily disabled" in messages or "stability issues" in messages:return AniListServiceError(AniListErrorType.CONNECTION_ERROR,"AniList has temporarily disabled API access because of service stability problems. Your search is valid; try again after AniList restores the API.",False,status)
         if status == 429:
             return AniListServiceError(
                 AniListErrorType.RATE_LIMITED,

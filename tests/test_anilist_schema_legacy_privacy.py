@@ -20,10 +20,11 @@ from anime_tracker.services.anilist.queries import MEDIA_BY_ID_QUERY
 from anilist_helpers import FIXTURE_ROOT, NOW, FakeResponse, client_for, fixture, media_response
 
 ROOT = Path(__file__).resolve().parents[1]
-PROTOTYPE = ROOT / "migration_test" / "anime_tracker_modern_v1.db"
-BACKUP_DB = ROOT / "modernization_backups" / "20260801-230906-verified" / "sqlite_online" / "anime_tracker.db"
-LIVE_DB = ROOT / "data" / "anime_tracker.db"
-EXPECTED_LIVE_HASH = "69763FC9EC883096041C6EDEDD9399B4697EBC650A48D07BA87879C787B3782E"
+MODERN_ROOT = ROOT / "Modern Anime Tracker"
+PROTOTYPE = MODERN_ROOT / "migration_test" / "anime_tracker_modern_v1.db"
+BACKUP_DB = MODERN_ROOT / "modernization_backups" / "20260801-230906-verified" / "sqlite_online" / "anime_tracker.db"
+LIVE_DB = ROOT / "Legacy Anime Tracker" / "data" / "anime_tracker.db"
+EXPECTED_LIVE_HASH = "0CBA84F7D08EAD16A69C1DF49D0A79A8351940A4D28E8049C60E591A1176BEB8"
 
 
 class SchemaV3Tests(unittest.TestCase):

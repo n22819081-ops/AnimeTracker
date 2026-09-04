@@ -4,10 +4,11 @@ import json
 import logging
 import os
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .normalization import normalize_title, title_tokens, title_variants
+from .normalization import NOISE_WORDS, normalize_title, title_tokens, title_variants
 from .path_utils import normalize_windows_path
 
 LOGGER = logging.getLogger(__name__)
@@ -87,7 +88,15 @@ TRACKED_SEASON_PATTERNS = (
     re.compile(r"\bseason\s*0*(\d{1,3})\b", re.IGNORECASE),
     re.compile(r"\bs0*(\d{1,3})\b", re.IGNORECASE),
     re.compile(r"\b(\d{1,3})(?:st|nd|rd|th)\s+season\b", re.IGNORECASE),
+    re.compile(r"\bpart\s+(i{1,3}|iv|v?i{1,3}|\d{1,3})\b", re.IGNORECASE),
+    re.compile(r"\b(second|third)\s+season\b", re.IGNORECASE),
 )
+# Trailing bare digit / "Ni" only counts as a season for sequel/prequel rows,
+# so titles like "86" or "22/7" are never misread as season numbers.
+TRAILING_SEASON_PATTERN = re.compile(r"\b(\d{1,3})\s*[!！?？]*\s*$")
+TRAILING_NII_PATTERN = re.compile(r"\bni\s*[!！?？]*\s*$", re.IGNORECASE)
+_ROMAN_SEASON_VALUES = {"i": 1, "ii": 2, "iii": 3, "iv": 4, "vi": 6, "vii": 7, "viii": 8}
+_SEQUEL_RELATION_LABELS = {"sequel", "prequel"}
 
 
 def detect_season_numbers(show_path: Path) -> frozenset[int]:
@@ -122,6 +131,40 @@ def season_number_from_episode_name(name: str) -> int | None:
     return None
 
 
+def _season_value_from_match(match) -> int | None:
+    if not match:
+        return None
+    token = str(match.group(1) or "").strip()
+    if token.isdigit():
+        return int(token)
+    roman = token.casefold()
+    if roman in _ROMAN_SEASON_VALUES:
+        return _ROMAN_SEASON_VALUES[roman]
+    spelled = token.casefold()
+    for name, number in (("first", 1), ("second", 2), ("third", 3), ("fourth", 4)):
+        if spelled == name:
+            return number
+    return None
+
+
+def _strip_season_indicators(title: str, strip_trailing: bool = True) -> str:
+    text = unicodedata.normalize("NFKD", str(title or ""))
+    text = text.encode("ascii", "ignore").decode("ascii").lower()
+    text = re.sub(r"\bseason\s*0*\d{1,3}\b", " ", text)
+    text = re.sub(r"\bs\d{1,3}\b", " ", text)
+    text = re.sub(r"\b\d{1,3}(?:st|nd|rd|th)\s+season\b", " ", text)
+    text = re.sub(r"\bpart\s+(?:i{1,3}|iv|v?i{1,3}|\d{1,3})\b", " ", text)
+    text = re.sub(r"\bsecond\s+season\b", " ", text)
+    text = re.sub(r"\bthird\s+season\b", " ", text)
+    if strip_trailing:
+        text = re.sub(r"\bni\s*[!！?？]*\s*$", " ", text)
+        text = re.sub(r"\b\d{1,3}\s*[!！?？]*\s*$", " ", text)
+    text = re.sub(r"\([^)]*\)|\[[^]]*\]", " ", text)
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    text = " ".join(part for part in text.split() if part not in NOISE_WORDS)
+    return text.strip()
+
+
 def tracked_season_number(row) -> int | None:
     values = [
         _row_value(row, "relation_label", ""),
@@ -135,31 +178,139 @@ def tracked_season_number(row) -> int | None:
     for value in values:
         for pattern in TRACKED_SEASON_PATTERNS:
             match = pattern.search(str(value or ""))
-            if match:
-                return int(match.group(1))
+            number = _season_value_from_match(match)
+            if number is not None:
+                return number
+    # A bare trailing digit ("Iruma-kun 2") or "Ni" only counts as a season
+    # indicator when AniList already marks the row as a sequel/prequel.
+    if str(_row_value(row, "relation_label", "")).casefold() in _SEQUEL_RELATION_LABELS:
+        for value in values:
+            text = str(value or "").strip()
+            trailing_nii = TRAILING_NII_PATTERN.search(text)
+            if trailing_nii:
+                return 2
+            trailing = TRAILING_SEASON_PATTERN.search(text)
+            if trailing:
+                return int(trailing.group(1))
     return None
+
+
+def _franchise_stem(row) -> str:
+    # Season indicators are stripped from every row in the franchise so the
+    # base entry and its sequels share one stem ("Iruma-kun" / "Iruma-kun 2"
+    # both -> "mairimashita! iruma-kun"). Titles without indicators are
+    # unaffected, so single-season shows never merge into a franchise group.
+    english = _strip_season_indicators(_row_value(row, "english_title", ""))
+    romaji = _strip_season_indicators(_row_value(row, "romaji_title", ""))
+    stem = " ".join(part for part in (english, romaji) if part)
+    if not stem:
+        native = _strip_season_indicators(_row_value(row, "native_title", ""))
+        stem = native
+    return stem
+
+
+def _group_rows(rows: list) -> dict[str, list]:
+    groups: dict[str, list] = {}
+    for row in rows:
+        key = (
+            normalize_title(_row_value(row, "english_title", "")),
+            normalize_title(_row_value(row, "romaji_title", "")),
+        )
+        groups.setdefault(f"base:{key[0]}|{key[1]}", []).append(row)
+    stem_groups: dict[str, list] = {}
+    for row in rows:
+        stem = _franchise_stem(row)
+        if stem:
+            stem_groups.setdefault(stem, []).append(row)
+    for stem, group in stem_groups.items():
+        if len(group) >= 2:
+            for row in group:
+                groups.pop(
+                    f"base:{normalize_title(_row_value(row, 'english_title', ''))}|{normalize_title(_row_value(row, 'romaji_title', ''))}",
+                    None,
+                )
+            groups[f"stem:{stem}"] = group
+    return groups
 
 
 def infer_tracked_seasons(rows) -> dict[int, int | None]:
     rows = list(rows)
     result = {int(row["anilist_id"]): tracked_season_number(row) for row in rows}
-    groups: dict[tuple[str, str], list] = {}
-    for row in rows:
-        if row["format"] == "MOVIE":
-            continue
-        key = (normalize_title(row["english_title"]), normalize_title(row["romaji_title"]))
-        groups.setdefault(key, []).append(row)
-    for group in groups.values():
+    # Group by franchise stem so the base entry and its sequels share one group.
+    for group in _group_rows(rows).values():
         if len(group) < 2:
             continue
-        ordered = sorted(group, key=lambda row: (row["year"] or 9999, row["start_date"] or "", row["anilist_id"]))
-        for index, row in enumerate(ordered, start=1):
-            result[int(row["anilist_id"])] = result[int(row["anilist_id"])] or index
+        ordered = sorted(
+            group,
+            key=lambda row: (
+                _row_value(row, "year", None) or 9999,
+                _row_value(row, "start_date", "") or "",
+                int(row["anilist_id"]),
+            ),
+        )
+        unmarked = [row for row in ordered if result[int(row["anilist_id"])] is None]
+        if not unmarked:
+            continue
+        explicit = [
+            result[int(row["anilist_id"])]
+            for row in ordered
+            if result[int(row["anilist_id"])] is not None
+        ]
+        if explicit and 1 not in explicit:
+            # The franchise has explicit season indicators but no Season 1 row:
+            # the earliest unmarked row is the missing Season 1.
+            result[int(unmarked[0]["anilist_id"])] = 1
+        else:
+            # Either no explicit indicators at all, or Season 1 is already
+            # explicit: infer by group order for every unmarked row (the
+            # original behavior, preserved verbatim).
+            for idx, row in enumerate(ordered, start=1):
+                if result[int(row["anilist_id"])] is None:
+                    result[int(row["anilist_id"])] = idx
     return result
 
 
-def candidate_supports_season(candidate: ServerCandidate, season_number: int | None) -> bool:
-    return season_number is None or season_number in candidate.season_numbers
+def multi_season_ids(rows) -> set[int]:
+    """anilist_ids of franchise entries that carry no reliable season number.
+
+    Only *ambiguous* entries qualify: sequel/prequel rows whose titles have no
+    season indicator (e.g. "Multi Show" with relation=Sequel). The earliest row
+    in a franchise group is the base entry and resolves to Season 1, so it is
+    never ambiguous — this keeps "Season 01 matches Season 1" working while
+    stopping a None-season sequel from auto-matching any franchise folder.
+    """
+    ids: set[int] = set()
+    for group in _group_rows(rows).values():
+        if len(group) < 2:
+            continue
+        ordered = sorted(
+            group,
+            key=lambda row: (
+                _row_value(row, "year", None) or 9999,
+                _row_value(row, "start_date", "") or "",
+                int(row["anilist_id"]),
+            ),
+        )
+        for row in ordered[1:]:
+            if (
+                str(_row_value(row, "format", "")).casefold() != "movie"
+                and str(_row_value(row, "relation_label", "")).casefold() in _SEQUEL_RELATION_LABELS
+                and tracked_season_number(row) is None
+            ):
+                ids.add(int(row["anilist_id"]))
+    return ids
+
+
+def candidate_supports_season(
+    candidate: ServerCandidate,
+    season_number: int | None,
+    multi_season: bool = False,
+) -> bool:
+    if season_number is not None:
+        return season_number in candidate.season_numbers
+    # Unknown season: only safe to accept a flat (season-less) folder for
+    # multi-season franchises; a single-season show keeps the old behavior.
+    return not candidate.season_numbers or not multi_season
 
 
 def confirmed_match_has_evidence(confirmed, candidates: list[ServerCandidate], season_number: int | None) -> bool:
@@ -176,7 +327,10 @@ def match_record(
     candidates: list[ServerCandidate],
     rejected_paths: set[str] | None = None,
     season_number: int | None = None,
+    multi_season_ids: set[int] | None = None,
 ) -> MatchResult:
+    anilist_id = _row_value(row, "anilist_id", -1)
+    multi_season = anilist_id in (multi_season_ids or set())
     alternates = json.loads(row["alternate_titles"] or "[]")
     variants = title_variants(
         row["english_title"],
@@ -198,13 +352,20 @@ def match_record(
     )
     if unresolved_active_sequel:
         return MatchResult("none", notes="An active sequel requires explicit season evidence before server matching.")
+    if expected_kind == "TV" and expected_season is None and multi_season:
+        return MatchResult(
+            "uncertain",
+            notes="Season number could not be determined for this franchise entry; "
+            "please review which Jellyfin season folder matches it.",
+            candidates=[],
+        )
 
     for candidate in candidates:
         if normalize_windows_path(candidate.path) in rejected:
             continue
         if candidate.media_kind != expected_kind:
             continue
-        if expected_kind == "TV" and not candidate_supports_season(candidate, expected_season):
+        if expected_kind == "TV" and not candidate_supports_season(candidate, expected_season, multi_season):
             continue
         match = score_candidate(row, variants, candidate, expected_season)
         if match.score >= 45:
@@ -224,9 +385,20 @@ def score_candidate(row, variants: set[str], candidate: ServerCandidate, season_
     score = 0
     reasons: list[str] = []
     candidate_tokens = title_tokens(candidate.normalized_name)
+    # A candidate only earns the season-evidence corroboration bonus if its
+    # title already positively matches the tracked show (exact match, or a
+    # substantial share of tokens -- >=2 shared AND >=40% of the title). A
+    # folder sharing only a couple of generic words (e.g. "in", "a") is noise
+    # and must not let folder metadata -- a "Season 01" subfolder plus a
+    # matching year -- lift an unrelated folder past the "possible" threshold.
+    # That was turning genuinely missing shows into spurious Needs-Review. This
+    # only gates the corroboration bonus; the core rule that a None season
+    # never means "any season" is left untouched.
+    title_positive = False
     if candidate.normalized_name in variants:
         score += 70
         reasons.append("normalized title matched a tracked title or synonym")
+        title_positive = True
     else:
         best_overlap = 0
         best_total = 0
@@ -238,10 +410,12 @@ def score_candidate(row, variants: set[str], candidate: ServerCandidate, season_
             if overlap > best_overlap:
                 best_overlap = overlap
                 best_total = max(len(tokens), len(candidate_tokens))
+        best_ratio = best_overlap / max(best_total, 1) if best_overlap else 0.0
         if best_overlap:
-            ratio = best_overlap / max(best_total, 1)
-            score += int(ratio * 55)
+            score += int(best_ratio * 55)
             reasons.append(f"title token overlap {best_overlap}/{best_total}")
+        if best_overlap >= 2 and best_ratio >= 0.4:
+            title_positive = True
     if row["year"] and candidate.year:
         if int(row["year"]) == candidate.year:
             score += 20
@@ -258,7 +432,7 @@ def score_candidate(row, variants: set[str], candidate: ServerCandidate, season_
     elif anime_format != "MOVIE" and candidate.media_kind == "TV":
         score += 10
         reasons.append("series format matched TV library")
-    if season_number is not None and season_number in candidate.season_numbers:
+    if season_number is not None and season_number in candidate.season_numbers and title_positive:
         score += 20
         reasons.append(f"Jellyfin season evidence matched Season {season_number}")
     total_episodes = _row_value(row, "total_episodes")

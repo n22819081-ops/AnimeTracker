@@ -13,7 +13,7 @@ from anime_tracker.services.server_inventory import FilesystemInventoryService, 
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BACKUP_DB = ROOT / "modernization_backups" / "20260801-230906-verified" / "sqlite_online" / "anime_tracker.db"
+BACKUP_DB = ROOT / "Modern Anime Tracker" / "modernization_backups" / "20260801-230906-verified" / "sqlite_online" / "anime_tracker.db"
 
 
 class ServerInventoryCompatibilityTests(unittest.TestCase):

@@ -9,8 +9,8 @@ Milestone 1 covers backup, Git, integrity inventory, schema design, a copy-only 
 - No `scheduled_check.lock` was present.
 - The restricted environment could not read Win32 process command lines or export/query the scheduled task. These permission failures are recorded and do not invalidate the file/database checkpoint.
 - No unrelated Python process was terminated.
-- Canonical backup root: `C:\AnimeTracker\modernization_backups\20260801-230906-verified`
-- Manifest: `C:\AnimeTracker\modernization_backups\20260801-230906-verified\backup_manifest.json`
+- Canonical backup root: `C:\AnimeTracker\Modern Anime Tracker\modernization_backups\20260801-230906-verified`
+- Manifest: `C:\AnimeTracker\Modern Anime Tracker\modernization_backups\20260801-230906-verified\backup_manifest.json`
 - Manifest entries: 241 meaningful files; generated `__pycache__` and `.pyc` files are excluded.
 - SQLite databases verified: 179 of 179 passed `PRAGMA integrity_check`.
 - Live database pre-backup SHA-256: `52D2F8D5E1365A655CDB915A6357822EEF21D8D226797A0EE791D03491D4B2A7`
@@ -41,7 +41,7 @@ The first checkpoint at `20260801-224532` is retained for audit history. An init
 ## Prototype Migration
 
 - Source: exact byte-copy database under the modernization backup.
-- Destination: ignored `migration_test\anime_tracker_modern_v1.db`.
+- Destination: ignored `Modern Anime Tracker\migration_test\anime_tracker_modern_v1.db`.
 - Modern schema version: 1.
 - Destination integrity check: `ok`.
 - Foreign-key violations: 0.

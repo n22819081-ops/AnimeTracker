@@ -18,7 +18,7 @@ from anime_tracker.runtime import PROJECT_PRODUCTION_PROFILE,system_drive_root
 
 
 ROOT=Path(__file__).parents[1]
-PRODUCTION=ROOT/"production_profile"
+PRODUCTION=ROOT/"Modern Anime Tracker"/"production_profile"
 
 
 def _hash(path:Path)->str:
@@ -40,9 +40,9 @@ def _production_copy(tmp_path:Path)->ProductionProfile:
 def test_system_drive_candidate_is_absolute_and_independent_of_working_directory(monkeypatch,tmp_path):
     monkeypatch.chdir(tmp_path)
     assert system_drive_root("C:")==Path("C:\\").resolve()
-    assert PROJECT_PRODUCTION_PROFILE==Path("C:\\AnimeTracker\\production_profile")
+    assert PROJECT_PRODUCTION_PROFILE==Path("C:\\AnimeTracker\\Modern Anime Tracker\\production_profile")
     assert PROJECT_PRODUCTION_PROFILE.is_absolute()
-    assert detect_project_profile()==Path("C:\\AnimeTracker\\production_profile")
+    assert detect_project_profile()==Path("C:\\AnimeTracker\\Modern Anime Tracker\\production_profile")
 
 
 def test_existing_profile_validation_is_read_only_redacted_and_complete():

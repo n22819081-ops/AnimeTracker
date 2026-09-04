@@ -10,8 +10,9 @@ from anime_tracker.production.schema import migrate_to_production_schema
 
 
 ROOT=Path(__file__).resolve().parents[1]
-V5=ROOT/"migration_test"/"anime_tracker_modern_v5.db"
-LEGACY=ROOT/"migration_test"/"legacy_gui_verification.db"
+MODERN_ROOT=ROOT/"Modern Anime Tracker"
+V5=MODERN_ROOT/"migration_test"/"anime_tracker_modern_v5.db"
+LEGACY=MODERN_ROOT/"migration_test"/"legacy_gui_verification.db"
 
 
 def production_profile(tmp_path:Path)->ProductionProfile:

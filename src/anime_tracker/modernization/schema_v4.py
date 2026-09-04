@@ -281,19 +281,50 @@ def _copy_legacy_rows(connection: sqlite3.Connection, now: str) -> None:
             )
 
     if _table_exists(connection, "legacy_match_candidates_v1"):
-        count = connection.execute("SELECT COUNT(*) FROM legacy_match_candidates_v1").fetchone()[0]
-        if count:
+        rows = connection.execute(
+            """
+            SELECT c.*, t.anilist_id FROM legacy_match_candidates_v1 c
+            JOIN tracked_media t ON t.id=c.tracked_media_id ORDER BY c.id
+            """
+        ).fetchall()
+        if rows:
+            # The legacy v1 table can carry two candidates on the same folder (a confident
+            # and a possible match). They all collapse into one legacy-import-session and
+            # are keyed by legacy||{normalized_path}|{media_kind}, so a second candidate on
+            # the same folder hits UNIQUE(session_id, target_identity_key) and aborts the
+            # whole re-migration. Keep the strongest per key (highest score, ties broken by
+            # earliest id) and preserve the losers in archived_legacy_records for manual
+            # review -- nothing is invented, nothing is dropped.
+            def _rank(r):
+                return (r["score"] if r["score"] is not None else 0, -r["id"])
+
+            best: dict[str, sqlite3.Row] = {}
+            for row in rows:
+                key = f"legacy||{row['normalized_path']}|{row['media_kind']}"
+                current = best.get(key)
+                if current is None or _rank(row) > _rank(current):
+                    best[key] = row
+            keep_ids = {row["id"] for row in best.values()}
+            duplicate_count = len(rows) - len(keep_ids)
             connection.execute(
                 "INSERT INTO matching_sessions VALUES(?,?,?,?,?,?,?,?,?,?)",
-                ("legacy-import-session", "default", "legacy-unknown", "legacy-unknown", now, now, count, count, 0, 1),
+                ("legacy-import-session", "default", "legacy-unknown", "legacy-unknown", now, now, len(keep_ids), duplicate_count, 0, 1),
             )
-            rows = connection.execute(
-                """
-                SELECT c.*, t.anilist_id FROM legacy_match_candidates_v1 c
-                JOIN tracked_media t ON t.id=c.tracked_media_id ORDER BY c.id
-                """
-            ).fetchall()
             for row in rows:
+                if row["id"] not in keep_ids:
+                    connection.execute(
+                        "INSERT INTO archived_legacy_records(source_table, source_key, legacy_anilist_id, reason, payload_json, requires_manual_review, archived_at) "
+                        "VALUES(?, ?, ?, ?, ?, 1, ?)",
+                        (
+                            "match_candidates",
+                            f"{row['anilist_id']}|{row['normalized_path']}|{row['media_kind']}",
+                            row["anilist_id"],
+                            "Duplicate legacy candidate for same folder. Manual review required",
+                            json.dumps(dict(row), ensure_ascii=False, sort_keys=True, default=str),
+                            now,  # archive time = migration time (matches _archive() in migration.py); original scanned_at is preserved in payload_json
+                        ),
+                    )
+                    continue
                 identity = f"legacy||{row['normalized_path']}|{row['media_kind']}"
                 evidence = {
                     "legacy_confidence_label": row["confidence_label"],

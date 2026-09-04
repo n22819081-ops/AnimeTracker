@@ -51,4 +51,4 @@ if (-not $SkipTests) {
     & $Python -m pytest
 }
 
-Write-Host "Anime Tracker installed. Run .\Run-AnimeTracker.ps1 to start."
+Write-Host "Anime Tracker installed. Run '.\Legacy Anime Tracker\Run-AnimeTracker.ps1' to start the legacy version or '.\Modern Anime Tracker\Run-AnimeTracker-Modern.ps1' to start the modern source version."

@@ -85,6 +85,9 @@ class AniListRelation:
     target_format: MediaKind = MediaKind.UNKNOWN
     target_status: AniListStatus = AniListStatus.UNKNOWN
     target_title: str = ""
+    target_season: str = ""
+    target_year: int | None = None
+    target_episode_count: int | None = None
     direction: RelationDirection = RelationDirection.OUTBOUND
     provider: str = "AniList"
     retrieved_at: datetime | None = None
@@ -315,6 +318,9 @@ def parse_relation(edge: Mapping[str, Any], source_id: int, retrieved_at: dateti
         target_format=parse_media_kind(node.get("format")),
         target_status=parse_anilist_status(node.get("status")),
         target_title=str(title),
+        target_season=str(node.get("season") or ""),
+        target_year=int(node["seasonYear"]) if node.get("seasonYear") is not None else None,
+        target_episode_count=int(node["episodes"]) if node.get("episodes") is not None else None,
         retrieved_at=retrieved_at,
     )
 
@@ -413,6 +419,9 @@ def media_to_payload(media: AniListMedia) -> dict[str, Any]:
                         "id": relation.target_anilist_id,
                         "format": relation.target_format.value,
                         "status": relation.target_status.value,
+                        "season": relation.target_season or None,
+                        "seasonYear": relation.target_year,
+                        "episodes": relation.target_episode_count,
                         "title": {"english": relation.target_title, "romaji": "", "native": ""},
                     },
                 }

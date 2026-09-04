@@ -91,6 +91,30 @@ class AniListCache:
         finally:
             connection.close()
 
+    @contextmanager
+    def _write_connection(self, existing: sqlite3.Connection | None = None) -> Iterator[tuple[sqlite3.Connection, bool]]:
+        """Yield (connection, commit_owned).
+
+        When ``existing`` is supplied the caller owns the transaction and the
+        commit (used by the atomic add path, which defers every write into one
+        connection and commits once). Otherwise a fresh connection is opened and
+        owned here, mirroring ``connect``.
+        """
+        if existing is not None:
+            yield existing, False
+            return
+        connection = sqlite3.connect(self.database_path)
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys=ON")
+        try:
+            yield connection, True
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
     def get_media(self, anilist_id: int, now: datetime) -> CacheRecord:
         with self.connect() as connection:
             row = connection.execute("SELECT * FROM anilist_media_cache WHERE anilist_id=?", (anilist_id,)).fetchone()
@@ -141,28 +165,36 @@ class AniListCache:
                 rows_by_id.update({int(row["anilist_id"]): row for row in rows})
         return {media_id: self._media_record_from_row(rows_by_id.get(media_id), now) for media_id in unique}
 
-    def put_media(self, media: AniListMedia, retrieved_at: datetime, *, raw_response: str = "") -> datetime:
+    def put_media(self, media: AniListMedia, retrieved_at: datetime, *, raw_response: str = "", connection: sqlite3.Connection | None = None) -> datetime:
         expires_at = retrieved_at + metadata_ttl(media, retrieved_at)
         payload = json.dumps(media_to_payload(media), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-        with self.connect() as connection:
-            connection.execute(
+        with self._write_connection(connection) as (conn, _):
+            has_metadata_table=conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='anilist_media'").fetchone() is not None
+            if has_metadata_table:
+                cover=media.cover_images.extra_large or media.cover_images.large or media.cover_images.medium
+                conn.execute(
+                    "INSERT INTO anilist_media(anilist_id,media_format,season_name,season_year,episode_count,anilist_status,start_date,end_date,cover_image_url,page_url,source_updated_at) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(anilist_id) DO UPDATE SET media_format=excluded.media_format,season_name=excluded.season_name,season_year=excluded.season_year,episode_count=excluded.episode_count,anilist_status=excluded.anilist_status,start_date=excluded.start_date,end_date=excluded.end_date,cover_image_url=excluded.cover_image_url,page_url=excluded.page_url,source_updated_at=excluded.source_updated_at",
+                    (media.anilist_id,media.media_format.value,media.season,media.season_year,media.episode_count,media.status.value,media.start_date.isoformat() if media.start_date else "",media.end_date.isoformat() if media.end_date else "",cover,media.site_url,retrieved_at.isoformat()),
+                )
+            conn.execute(
                 "INSERT INTO anilist_media_cache(anilist_id,normalized_payload_json,raw_response_json,retrieved_at,expires_at,last_successful_refresh,last_attempted_refresh,last_error_type,last_error_message,failure_count,stale) "
                 "VALUES(?,?,?,?,?,?,?,'','',0,0) ON CONFLICT(anilist_id) DO UPDATE SET normalized_payload_json=excluded.normalized_payload_json,raw_response_json=excluded.raw_response_json,retrieved_at=excluded.retrieved_at,expires_at=excluded.expires_at,last_successful_refresh=excluded.last_successful_refresh,last_attempted_refresh=excluded.last_attempted_refresh,last_error_type='',last_error_message='',failure_count=0,stale=0",
                 (media.anilist_id, payload, raw_response, retrieved_at.isoformat(), expires_at.isoformat(), retrieved_at.isoformat(), retrieved_at.isoformat()),
             )
-            connection.execute("DELETE FROM anilist_title_variants WHERE anilist_id=?", (media.anilist_id,))
+            conn.execute("DELETE FROM anilist_title_variants WHERE anilist_id=?", (media.anilist_id,))
             title_rows = [
                 ("primary", media.title.primary), ("english", media.title.english),
                 ("romaji", media.title.romaji), ("native", media.title.native),
                 *(("synonym", item) for item in media.title.synonyms),
             ]
-            connection.executemany(
+            conn.executemany(
                 "INSERT OR IGNORE INTO anilist_title_variants(anilist_id,title_type,title,normalized_title) VALUES(?,?,?,?)",
                 [(media.anilist_id, kind, title, normalize_title(title)) for kind, title in title_rows if title],
             )
-            connection.execute("DELETE FROM anilist_relations WHERE source_anilist_id=?", (media.anilist_id,))
-            self._put_relations(connection, media.relations, retrieved_at)
-            connection.execute(
+            conn.execute("DELETE FROM anilist_relations WHERE source_anilist_id=?", (media.anilist_id,))
+            self._put_relations(conn, media.relations, retrieved_at)
+            conn.execute(
                 "INSERT OR REPLACE INTO anilist_relation_state(anilist_id,retrieved_at,expires_at) VALUES(?,?,?)",
                 (media.anilist_id, retrieved_at.isoformat(), (retrieved_at + RELATIONS_TTL).isoformat()),
             )

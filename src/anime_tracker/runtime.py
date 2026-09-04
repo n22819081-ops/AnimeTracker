@@ -10,6 +10,7 @@ APP_VERSION = "1.0.0"
 BUILD_IDENTIFIER = "1.0.0-rc1"
 SCHEMA_VERSION = 6
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+MODERN_PROJECT_ROOT = PROJECT_ROOT / "Modern Anime Tracker"
 RELEASE_MANIFEST_NAME = "RELEASE_MANIFEST_1.0.0.json"
 
 
@@ -20,7 +21,7 @@ def system_drive_root(value: str | None = None) -> Path:
     return Path(drive).resolve(strict=False)
 
 
-PROJECT_PRODUCTION_PROFILE = system_drive_root() / "AnimeTracker" / "production_profile"
+PROJECT_PRODUCTION_PROFILE = system_drive_root() / "AnimeTracker" / "Modern Anime Tracker" / "production_profile"
 
 
 def is_frozen() -> bool:
@@ -40,7 +41,7 @@ def default_profile_root() -> Path:
     override = os.environ.get("ANIME_TRACKER_PROFILE", "").strip()
     if override:
         return validate_profile_override(Path(override))
-    return per_user_profile_root() if is_frozen() else PROJECT_ROOT / "production_profile"
+    return per_user_profile_root() if is_frozen() else MODERN_PROJECT_ROOT / "production_profile"
 
 
 def validate_profile_override(path: Path) -> Path:
@@ -50,7 +51,7 @@ def validate_profile_override(path: Path) -> Path:
     resolved = value.resolve(strict=False)
     if resolved == application_directory().resolve(strict=False):
         raise ValueError("The profile cannot be the application installation directory.")
-    protected = {(system_drive_root()/"AnimeTracker"/"data").resolve(strict=False)}
+    protected = {(system_drive_root()/"AnimeTracker"/"Legacy Anime Tracker"/"data").resolve(strict=False)}
     if resolved in protected:
         raise ValueError("The selected path is not an application-owned profile directory.")
     return resolved

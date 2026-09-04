@@ -24,9 +24,9 @@ from matching_helpers import NOW, inventory_item, media, snapshot
 
 
 ROOT = Path(__file__).resolve().parents[1]
-V3_PROTOTYPE = ROOT / "migration_test" / "anime_tracker_modern_v3.db"
-LIVE_DB = ROOT / "data" / "anime_tracker.db"
-LIVE_HASH = "69763FC9EC883096041C6EDEDD9399B4697EBC650A48D07BA87879C787B3782E"
+V3_PROTOTYPE = ROOT / "Modern Anime Tracker" / "migration_test" / "anime_tracker_modern_v3.db"
+LIVE_DB = ROOT / "Legacy Anime Tracker" / "data" / "anime_tracker.db"
+LIVE_HASH = "0CBA84F7D08EAD16A69C1DF49D0A79A8351940A4D28E8049C60E591A1176BEB8"
 
 
 class SchemaV4Tests(unittest.TestCase):

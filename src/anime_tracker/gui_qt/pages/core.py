@@ -6,8 +6,8 @@ from pathlib import Path
 from PySide6.QtCore import Qt,QUrl,Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QApplication,QCheckBox, QComboBox, QFormLayout, QFrame, QGridLayout, QGroupBox, QHBoxLayout,
-    QLabel, QLineEdit, QListWidget, QPushButton, QScrollArea, QTabWidget, QTableWidget,
+    QAbstractItemView,QApplication,QCheckBox, QComboBox, QFormLayout, QFrame, QGridLayout, QGroupBox, QHBoxLayout,
+    QLabel, QLineEdit, QListWidget, QListWidgetItem, QPushButton, QScrollArea, QTabWidget, QTableWidget,
     QTableWidgetItem, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
@@ -63,18 +63,20 @@ class AnimeListPage(Page):
 
 
 class MoviesPage(AnimeListPage):
-    def __init__(self,repo): super().__init__("Movies",repo,lambda r:r.media_format=="MOVIE","Availability remains Unknown unless supported by an explicit source or manual decision.",{
+    def __init__(self,repo): super().__init__("Movies",repo,lambda r:r.media_format=="MOVIE" and r.server_status!="COMPLETE" and r.tracker_status!="On Server","Movies still needing tracking or server action. Confirmed On Server movies move to the On Server page.",{
         "All":lambda r:True,"Upcoming":lambda r:r.tracker_status=="Upcoming","Theatrical only":lambda r:"Theatrical" in r.tracker_status,
-        "Digitally available":lambda r:"Digital" in r.tracker_status,"On server":lambda r:r.server_status=="COMPLETE",
+        "Digitally available":lambda r:"Digital" in r.tracker_status,"Needs review":lambda r:r.tracker_status=="Needs Review",
     })
 
 
 class FranchisePage(Page):
     row_activated=Signal(object)
+    add_related_requested=Signal(int)
     def __init__(self,repo):
         super().__init__("Franchises","AniList relationships and server mappings remain separate identities."); self.repo=repo
         self.tree=QTreeWidget(); self.tree.setHeaderLabels(["Title","Relations","Format / Season","AniList Status","Server Target","Tracker Status","Season Scope","Coverage","Review"]); self.tree.setAlternatingRowColors(True)
-        self.tree.itemDoubleClicked.connect(self._activate); self.layout.addWidget(self.tree,1); self.refresh()
+        self.tree.itemDoubleClicked.connect(self._activate);self.tree.itemSelectionChanged.connect(self._selection_changed); self.layout.addWidget(self.tree,1)
+        self.add_related=QPushButton("Add Selected Related Anime");self.add_related.setEnabled(False);self.add_related.setToolTip("Add an untracked AniList sequel, prequel, side story, movie, OVA, or special after explicit confirmation.");self.add_related.clicked.connect(self._add_related);self.layout.addWidget(self.add_related);self.refresh()
     def refresh(self):
         self.tree.clear();rows=self.repo.tracked_media();by_id={row.anilist_id:row for row in rows};adjacency={key:set() for key in by_id}
         for row in rows:
@@ -95,10 +97,19 @@ class FranchisePage(Page):
                 relation="; ".join(f"{item.direction} {item.relation_type.replace('_',' ').title()}: {item.title}" for item in row.relations) or "No cached relation"
                 scope=f"Season {row.mapping_label.rsplit('Season ',1)[-1]}" if "Season " in row.mapping_label else ("Movie" if row.media_format=="MOVIE" else "Unspecified")
                 child=QTreeWidgetItem([row.title,relation,f"{row.media_format} · {row.season or 'No season'} {row.year or ''}",row.anilist_status,row.mapping_label,row.tracker_status,scope,row.coverage,row.review_reason or row.review or "None"]); child.setData(0,Qt.UserRole,row); parent.addChild(child)
+            related={relation.target_anilist_id:relation for row in rows for relation in row.relations if relation.target_anilist_id not in by_id}
+            for relation in sorted(related.values(),key=lambda value:value.title.casefold()):
+                child=QTreeWidgetItem([relation.title,relation.relation_type.replace('_',' ').title(),relation.media_format or "Unknown",relation.status or "Unknown","Not evaluated","Not tracked","Not mapped","Not evaluated","Add explicitly to track"]);child.setData(0,Qt.UserRole,{"related_anilist_id":relation.target_anilist_id});parent.addChild(child)
         self.tree.resizeColumnToContents(0)
     def _activate(self,item,column):
         row=item.data(0,Qt.UserRole)
-        if row:self.row_activated.emit(row)
+        if isinstance(row,dict):self.add_related_requested.emit(int(row["related_anilist_id"]))
+        elif row:self.row_activated.emit(row)
+    def _selection_changed(self):
+        selected=self.tree.selectedItems();value=selected[0].data(0,Qt.UserRole) if selected else None;self.add_related.setEnabled(isinstance(value,dict) and bool(value.get("related_anilist_id")))
+    def _add_related(self):
+        selected=self.tree.selectedItems();value=selected[0].data(0,Qt.UserRole) if selected else None
+        if isinstance(value,dict) and value.get("related_anilist_id"):self.add_related_requested.emit(int(value["related_anilist_id"]))
     def set_search(self,text):
         query=text.casefold().strip()
         for index in range(self.tree.topLevelItemCount()):
@@ -118,8 +129,11 @@ class CoveragePage(Page):
         rows=self.repo.tracked_media(); self.by_anime.clear();self.missing.clear();self.by_folder.clear()
         for row in rows:
             scope=(f"Season {row.mapping_label.rsplit('Season ',1)[-1]}" if "Season " in row.mapping_label else ("Movie" if row.media_format=="MOVIE" else "Unspecified"))
-            coverage="Not evaluated" if row.mapping_state in {"Not mapped","Suggestion available"} else ("Unknown" if row.coverage=="UNKNOWN" else row.coverage.replace("_"," ").title())
-            self.by_anime.addTopLevelItem(QTreeWidgetItem([row.title,scope,str(row.expected_episodes or "Unknown"),str(row.aired_episodes if row.aired_episodes is not None else "Unknown"),str(row.present_episodes if row.present_episodes is not None else "Unknown"),", ".join(map(str,row.missing_episodes)) or "None known",coverage,row.mapping_state,row.mapping_label]))
+            awaiting=row.mapping_state in {"Not mapped","Suggestion available"};coverage="Awaiting confirmed mapping" if awaiting else ("Unknown" if row.coverage=="UNKNOWN" else row.coverage.replace("_"," ").title())
+            present="Not scanned until mapped" if awaiting else str(row.present_episodes if row.present_episodes is not None else "Unknown")
+            missing="Not evaluated" if awaiting else (", ".join(map(str,row.missing_episodes)) or "None missing")
+            target="Choose server folder" if row.mapping_state=="Not mapped" else row.mapping_label
+            self.by_anime.addTopLevelItem(QTreeWidgetItem([row.title,scope,str(row.expected_episodes or "Unknown"),str(row.aired_episodes if row.aired_episodes is not None else "Unknown"),present,missing,coverage,row.mapping_state,target]))
             if row.server_status=="PARTIAL":self.missing.addTopLevelItem(QTreeWidgetItem([row.title,", ".join(map(str,row.missing_episodes)) or "Episode evidence unavailable",row.mapping_label]))
         for folder in self.repo.server_folder_rows():
             self.by_folder.addTopLevelItem(QTreeWidgetItem([folder["display_name"],folder["seasons"],folder["mapped_titles"],folder["mapping_scopes"],folder["unmapped"],str(folder["ambiguous_files"])]))
@@ -156,8 +170,12 @@ class ReviewPage(Page):
 
 
 class NotificationsPage(Page):
+    send_announcement_requested=Signal(object)
     def __init__(self,repo,*,production:bool=False):
         super().__init__("Notifications","Notification state for the active production profile. Credential values are never displayed." if production else "Test-profile outbox only. Credential values are never displayed and production delivery is disabled."); self.repo=repo
+        self.production=production;composer=QGroupBox("Tell the shared chat what is new on the server");compose=QVBoxLayout(composer);compose.addWidget(QLabel("Select one or more confirmed On Server titles. Only the displayed titles are sent—never paths, credentials, or scan details."));self.available=QListWidget();self.available.setSelectionMode(QAbstractItemView.MultiSelection);compose.addWidget(self.available);compose_actions=QHBoxLayout();self.copy_announcement=QPushButton("Copy Preview");self.send_announcement=QPushButton("Send Selected to Shared Chat");self.send_announcement.setObjectName("primary");self.send_announcement.setEnabled(False);self.copy_announcement.setEnabled(False);compose_actions.addWidget(self.copy_announcement);compose_actions.addWidget(self.send_announcement);compose_actions.addStretch();compose.addLayout(compose_actions);self.layout.addWidget(composer)
+        self.available.itemSelectionChanged.connect(self._announcement_selection_changed);self.copy_announcement.clicked.connect(self._copy_announcement);self.send_announcement.clicked.connect(lambda:self.send_announcement_requested.emit(self._selected_announcement_items()))
+        if not production:self.send_announcement.setToolTip("Shared delivery is available only in the active production profile.")
         self.tabs=QTabWidget(); self.tables={}
         for status in ("PENDING","RETRY_WAIT","DELIVERED","FAILED_PERMANENT","SUPPRESSED","CANCELED"):
             table=QTableWidget(0,7); table.setHorizontalHeaderLabels(["Event","Anime","Channel","Created","Status","Attempts","Last error"]); self.tables[status]=table; self.tabs.addTab(table,status.replace("_"," ").title())
@@ -165,12 +183,23 @@ class NotificationsPage(Page):
         for button in (self.retry,self.cancel,self.payload,self.deliveries,self.clear):button.setEnabled(False); actions.addWidget(button)
         actions.addStretch(); actions.addWidget(self.preview); self.layout.addWidget(self.tabs,1); self.layout.addLayout(actions); self.refresh()
     def refresh(self):
+        selected={item.data(Qt.UserRole)["anilist_id"] for item in self.available.selectedItems()} if self.available.count() else set();self.available.clear()
+        for row in self.repo.tracked_media():
+            if row.server_status!="COMPLETE" and row.tracker_status!="On Server":continue
+            item=QListWidgetItem(row.title);item.setData(Qt.UserRole,{"anilist_id":row.anilist_id,"title":row.title});self.available.addItem(item);item.setSelected(row.anilist_id in selected)
+        self._announcement_selection_changed()
         for table in self.tables.values():table.setRowCount(0)
         for row in self.repo.notification_rows():
             table=self.tables.get(row["status"])
             if table is None:continue
             pos=table.rowCount(); table.insertRow(pos)
             for col,key in enumerate(("event_type","display_title","channel_purpose","created_at","status","attempt_count","last_error_message")):table.setItem(pos,col,QTableWidgetItem(str(row[key] or "")))
+    def _selected_announcement_items(self):return tuple(item.data(Qt.UserRole) for item in self.available.selectedItems())
+    def _announcement_text(self):
+        items=self._selected_announcement_items();return "New on Jellyfin:\n"+"\n".join(f"• {item['title']}" for item in items)
+    def _announcement_selection_changed(self):
+        ready=bool(self._selected_announcement_items());self.copy_announcement.setEnabled(ready);self.send_announcement.setEnabled(ready and self.production)
+    def _copy_announcement(self):QApplication.clipboard().setText(self._announcement_text())
     def set_search(self,text):
         query=text.casefold().strip()
         for table in self.tables.values():

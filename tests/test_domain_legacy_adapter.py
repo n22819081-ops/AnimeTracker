@@ -10,8 +10,9 @@ from anime_tracker.domain.status_engine import decide_status
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BACKUP_DB = ROOT / "modernization_backups" / "20260801-230906-verified" / "sqlite_online" / "anime_tracker.db"
-PROTOTYPE_DB = ROOT / "migration_test" / "anime_tracker_modern_v1.db"
+MODERN_ROOT = ROOT / "Modern Anime Tracker"
+BACKUP_DB = MODERN_ROOT / "modernization_backups" / "20260801-230906-verified" / "sqlite_online" / "anime_tracker.db"
+PROTOTYPE_DB = MODERN_ROOT / "migration_test" / "anime_tracker_modern_v1.db"
 
 
 def sample_row(**changes):

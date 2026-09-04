@@ -62,7 +62,7 @@ Source and test compilation passed with `python -m compileall -q src tests`.
 - All 8 Storage Checker files match the verified backup manifest; mismatches: 0.
 - The separate Storage Checker was not imported, executed, or modified.
 - Hidden legacy GUI smoke used a temporary database copy: 69 model rows, 69 tree rows, 69.28 ms construction.
-- The pre-change Git rollback bundle is verified at `modernization_backups\20260802-milestone4-prechange`; SHA-256 `2E8B2B3BE58FC6CD4E4DF55C3B82FC2F62953B44B8F384BBDFB0EC04BB908B01`.
+- The pre-change Git rollback bundle is verified at `Modern Anime Tracker\modernization_backups\20260802-milestone4-prechange`; SHA-256 `2E8B2B3BE58FC6CD4E4DF55C3B82FC2F62953B44B8F384BBDFB0EC04BB908B01`.
 
 ## Performance
 

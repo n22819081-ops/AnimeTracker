@@ -24,9 +24,9 @@ exports/
 build/
 dist/
 *.spec
-!packaging/anime_tracker.spec
+!Modern Anime Tracker/packaging/anime_tracker.spec
 release/
-packaging/installer-staging/
+Modern Anime Tracker/packaging/installer-staging/
 
 # The Jellyfin Storage Checker is a separate product.
 jellyfin storage checker/

@@ -36,6 +36,15 @@ relations {
 }
 """
 
+HEALTH_CHECK_QUERY = """
+query {
+  Media(id: 1, type: ANIME) {
+    id
+    title { romaji }
+  }
+}
+"""
+
 
 class AniListError(RuntimeError):
     pass
@@ -73,6 +82,43 @@ class AniListClient:
         """
         data = self._post(query, {"search": title, "perPage": per_page})
         return (data.get("Page") or {}).get("media") or []
+
+    def health_check(self, timeout: float = 8.0) -> tuple[bool, str]:
+        """Manually check whether the AniList GraphQL API is reachable.
+
+        Performs a single lightweight public query (no authentication) with a
+        short timeout and no retries. Returns ``(online, detail)`` where
+        ``online`` is True only for a usable API response: HTTP 200, valid
+        JSON, no GraphQL errors, and a ``Media`` entry present. Rate limiting
+        (HTTP 429) is deliberately reported as offline, not success. The
+        ``detail`` string is a short human-readable reason and never contains
+        credentials.
+        """
+        try:
+            response = self.session.post(
+                ANILIST_URL,
+                json={"query": HEALTH_CHECK_QUERY, "variables": {}},
+                timeout=timeout,
+            )
+        except requests.RequestException as exc:
+            detail = f"{type(exc).__name__}: {exc}".strip()
+            LOGGER.warning("AniList health check failed: %s", detail)
+            return False, detail
+        if response.status_code == 429:
+            return False, "AniList is rate limiting requests (HTTP 429)"
+        if response.status_code != 200:
+            return False, f"AniList returned HTTP {response.status_code}"
+        try:
+            payload = response.json()
+        except ValueError:
+            return False, "AniList returned a non-JSON response"
+        if not isinstance(payload, dict) or payload.get("errors"):
+            return False, "AniList returned an error response"
+        data = payload.get("data")
+        if not isinstance(data, dict) or not isinstance(data.get("Media"), dict):
+            return False, "AniList returned an unusable response"
+        LOGGER.info("AniList health check passed")
+        return True, "AniList responded to the health check query"
 
     def _post(self, query: str, variables: dict[str, Any]) -> dict[str, Any]:
         last_error: Exception | None = None

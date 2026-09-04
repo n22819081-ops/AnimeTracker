@@ -1,6 +1,6 @@
 @echo off
 setlocal
-set "ROOT=%~dp0"
+for %%I in ("%~dp0..") do set "ROOT=%%~fI\"
 set "PYTHON=%ROOT%.venv\Scripts\python.exe"
 if not exist "%PYTHON%" (
     echo Anime Tracker is not installed yet. Run Install-AnimeTracker.bat first.
@@ -11,6 +11,6 @@ pushd "%ROOT%"
 "%PYTHON%" -m anime_tracker.app --scheduled-check
 set "RESULT=%ERRORLEVEL%"
 popd
-if not "%RESULT%"=="0" echo Scheduled check failed. See logs\anime_tracker.log.
+if not "%RESULT%"=="0" echo Scheduled check failed. See Legacy Anime Tracker\logs\anime_tracker.log.
 pause
 exit /b %RESULT%

@@ -22,7 +22,7 @@ from anime_tracker.production.scheduled import ScheduledCheckRunner
 
 
 ROOT=Path(__file__).parents[1]
-SOURCE=ProductionProfile(ROOT/"production_profile")
+SOURCE=ProductionProfile(ROOT/"Modern Anime Tracker"/"production_profile")
 
 
 def timed(operation):

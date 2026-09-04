@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 import uuid
 from contextlib import closing
@@ -14,6 +15,7 @@ from ..normalization import normalize_title
 from ..services.anilist.cache import AniListCache
 from ..services.anilist.cancellation import Cancellation
 from ..services.anilist.client import AniListGraphQLClient
+from ..services.anilist.errors import AniListErrorType
 from ..services.anilist.service import AniListService
 from ..services.server_inventory.models import (
     FileClassification, InventoryFile, InventoryLibraryItem, InventorySeason, InventorySpecialGroup,
@@ -21,6 +23,8 @@ from ..services.server_inventory.models import (
 )
 from ..services.server_inventory.service import FilesystemInventoryService
 from .profile import ProductionProfile
+
+LOGGER = logging.getLogger(__name__)
 
 
 def configured_roots(profile:ProductionProfile)->tuple[LibraryRoot,...]:
@@ -52,12 +56,65 @@ class ProductionAniListOperations:
             batch=self.service.refresh_batch(requested,force_refresh=force,token=token,include_archived=False)
             results=batch.results;succeeded=batch.succeeded;failed=batch.failed;cache_hits=batch.cache_hits;state=batch.state.value
         for result in results:
-            if result.success and result.updated_data:self._sync_media(result.updated_data)
+            if result.success and result.updated_data and result.network_request_performed and not result.stale_cache_used:self._sync_media(result.updated_data)
         after=self._metadata_fingerprints(requested)
         changed=sum(before.get(item)!=after.get(item) for item in requested)
         if baseline:
             bootstrap=self.profile.load_bootstrap();bootstrap["initial_anilist_baseline_state"]="ACCEPTED" if failed==0 else "PARTIAL";bootstrap["initial_anilist_baseline_at"]=datetime.now(timezone.utc).isoformat();self.profile.save_bootstrap(bootstrap)
         return {"state":state,"requested":len(requested),"checked":len(requested),"succeeded":succeeded,"failed":failed,"cache_hits":cache_hits,"network_requests":sum(item.network_request_count for item in results),"metadata_changes":changed,"notifications_created":0,"failures":[{"anilist_id":item.anilist_id,"error_type":item.error_type} for item in results if not item.success]}
+
+    def add_tracked_media(self,anilist_ids,*,token:Cancellation|None=None)->dict:
+        requested=tuple(dict.fromkeys(int(value) for value in anilist_ids if int(value)>0));added=[];existing=[];failed=[]
+        for anilist_id in requested:
+            # One connection owns the whole add: the cache write, the
+            # anilist_media + media_titles write, and the tracked rows all land
+            # in a single transaction with one commit, so a mid-run cancel or
+            # crash rolls everything back instead of leaving cache-only stragglers.
+            connection=sqlite3.connect(self.profile.database_path)
+            connection.row_factory=sqlite3.Row
+            connection.execute("PRAGMA foreign_keys=ON")
+            try:
+                result=self.service.get_media(anilist_id,token=token,cache_connection=connection)
+                if not result.success or result.updated_data is None:
+                    failed.append({"anilist_id":anilist_id,"error_type":result.error_type or "NOT_FOUND"})
+                    connection.rollback();continue
+                media=result.updated_data
+                if token is not None and token.is_cancelled():
+                    failed.append({"anilist_id":anilist_id,"error_type":AniListErrorType.CANCELED.value});connection.rollback();continue
+                self._sync_media_into(connection,media)
+                now=datetime.now(timezone.utc).isoformat()
+                tracked=connection.execute("SELECT id,archived_at FROM tracked_media WHERE anilist_id=?",(anilist_id,)).fetchone()
+                if tracked is None:
+                    cursor=connection.execute("INSERT INTO tracked_media(anilist_id,added_at,manual_notes,legacy_payload_json) VALUES(?,?,?,?)",(anilist_id,now,"","{}"));tracked_id=cursor.lastrowid
+                    tracker=_tracker_status(media.status.value,media.media_format.value,"")
+                    connection.execute("INSERT INTO tracking_state(tracked_media_id,tracker_status,server_presence,episode_coverage,review_status,review_reason,movie_availability,legacy_server_status,last_checked) VALUES(?,?,?,?,?,?,?,?,?)",(tracked_id,tracker,"NOT_ON_SERVER","NONE","NONE","","unknown","",now))
+                    connection.execute("INSERT INTO status_history(tracked_media_id,event_type,previous_tracker_status,new_tracker_status,created_at) VALUES(?,?,?,?,?)",(tracked_id,"ADDED_TO_TRACKER","",tracker,now));added.append(anilist_id)
+                elif tracked[1] is not None:
+                    tracker=_tracker_status(media.status.value,media.media_format.value,"")
+                    connection.execute("UPDATE tracked_media SET archived_at=NULL,archive_reason='' WHERE id=?",(tracked[0],));connection.execute("UPDATE tracking_state SET tracker_status=?,server_presence='NOT_ON_SERVER',episode_coverage='NONE',review_status='NONE',review_reason='',last_checked=? WHERE tracked_media_id=?",(tracker,now,tracked[0]));connection.execute("INSERT INTO status_history(tracked_media_id,event_type,previous_tracker_status,new_tracker_status,created_at) VALUES(?,?,?,?,?)",(tracked[0],"RESTORED_TO_TRACKER","Archived",tracker,now));added.append(anilist_id)
+                else:existing.append(anilist_id)
+                connection.commit()
+                self._verify_add(connection,anilist_id)
+            except Exception as exc:
+                connection.rollback()
+                LOGGER.warning("add_tracked_media FAILED for %s (rolled back; no auto-heal): %s",anilist_id,exc,exc_info=True)
+                raise
+            finally:
+                connection.close()
+        return {"requested":len(requested),"added":len(added),"existing":len(existing),"failed":len(failed),"added_ids":tuple(added),"existing_ids":tuple(existing),"failures":tuple(failed),"notifications_created":0}
+
+    def _verify_add(self,connection,anilist_id:int)->None:
+        """Post-commit check that the add actually landed. Read-only: on a
+        mismatch it logs a WARNING and stops (no rollback, no re-write) — the
+        headless `reconcile` command remains the backfill net."""
+        tracked=connection.execute("SELECT id FROM tracked_media WHERE anilist_id=? AND archived_at IS NULL",(anilist_id,)).fetchone()
+        media=connection.execute("SELECT anilist_id FROM anilist_media WHERE anilist_id=?",(anilist_id,)).fetchone()
+        titles=connection.execute("SELECT count(*) FROM media_titles WHERE anilist_id=?",(anilist_id,)).fetchone()[0]
+        missing=[name for name,present in (("tracked_media",tracked is not None),("anilist_media",media is not None),("media_titles",titles>0)) if not present]
+        if missing:
+            LOGGER.warning("add_tracked_media post-commit verification FAILED for %s: missing %s (no auto-heal; run headless reconcile)",anilist_id,", ".join(missing))
+        else:
+            LOGGER.info("add_tracked_media verified post-commit for %s (tracked active + anilist_media + %d title variant(s))",anilist_id,titles)
 
     def _metadata_fingerprints(self,ids)->dict[int,tuple]:
         if not ids:return {}
@@ -66,12 +123,16 @@ class ProductionAniListOperations:
             rows=connection.execute(f"SELECT anilist_id,media_format,season_name,season_year,episode_count,anilist_status,start_date,end_date,cover_image_url,page_url FROM anilist_media WHERE anilist_id IN ({placeholders})",tuple(ids)).fetchall()
         return {int(row[0]):tuple(row[1:]) for row in rows}
 
-    def _sync_media(self,media)->None:
+    def _sync_media_into(self,connection,media)->None:
         now=datetime.now(timezone.utc).isoformat();cover=media.cover_images.extra_large or media.cover_images.large or media.cover_images.medium
+        connection.execute("INSERT INTO anilist_media(anilist_id,media_format,season_name,season_year,episode_count,anilist_status,start_date,end_date,cover_image_url,page_url,source_updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(anilist_id) DO UPDATE SET media_format=excluded.media_format,season_name=excluded.season_name,season_year=excluded.season_year,episode_count=excluded.episode_count,anilist_status=excluded.anilist_status,start_date=excluded.start_date,end_date=excluded.end_date,cover_image_url=excluded.cover_image_url,page_url=excluded.page_url,source_updated_at=excluded.source_updated_at",(media.anilist_id,media.media_format.value,media.season,media.season_year,media.episode_count,media.status.value,media.start_date.isoformat() if media.start_date else "",media.end_date.isoformat() if media.end_date else "",cover,media.site_url,now))
+        for kind,title in (("english",media.title.english),("romaji",media.title.romaji),("native",media.title.native),*(("synonym",item) for item in media.title.synonyms)):
+            if title:connection.execute("INSERT OR REPLACE INTO media_titles(anilist_id,title_type,title,normalized_title) VALUES(?,?,?,?)",(media.anilist_id,kind,title,normalize_title(title)))
+
+    def _sync_media(self,media)->None:
         with closing(sqlite3.connect(self.profile.database_path)) as connection:
-            connection.execute("UPDATE anilist_media SET media_format=?,season_name=?,season_year=?,episode_count=?,anilist_status=?,start_date=?,end_date=?,cover_image_url=?,page_url=?,source_updated_at=? WHERE anilist_id=?",(media.media_format.value,media.season,media.season_year,media.episode_count,media.status.value,media.start_date.isoformat() if media.start_date else "",media.end_date.isoformat() if media.end_date else "",cover,media.site_url,now,media.anilist_id))
-            for kind,title in (("english",media.title.english),("romaji",media.title.romaji),("native",media.title.native),*(("synonym",item) for item in media.title.synonyms)):
-                if title:connection.execute("INSERT OR REPLACE INTO media_titles(anilist_id,title_type,title,normalized_title) VALUES(?,?,?,?)",(media.anilist_id,kind,title,normalize_title(title)))
+            connection.execute("PRAGMA foreign_keys=ON")
+            self._sync_media_into(connection,media)
             connection.commit()
 
 
@@ -114,6 +175,28 @@ class ProductionInventoryOperations:
         self._sync_tracking_state(anilist_id,evaluations,now)
         evaluation=next((item for item in evaluations if item.mapping.mapping_id==mapping.mapping_id),None)
         return {"mapping_id":mapping.mapping_id,"target":mapping.target.display_name or mapping.target.relative_path,"season_number":mapping.target.season_number,"server_presence":evaluation.server_presence.value if evaluation else "UNKNOWN_COVERAGE"}
+
+    def confirm_manual_target(self,anilist_id:int,choice:dict,*,profile_id:str="default")->dict:
+        from ..domain.enums import TrackingContentKind
+        from ..services.matching.candidates import inventory_snapshot_id
+        from ..services.matching.models import MappingTarget,MappingTargetType,PathState
+        from ..services.matching.repository import MatchingRepository
+        from ..services.matching.service import MatchingService
+        snapshot=self.latest_complete_snapshot();item=next((value for value in snapshot.items if value.item_id==choice.get("inventory_item_id")),None)
+        if item is None:raise ValueError("The selected folder is not present in the latest complete Jellyfin scan.")
+        season_number=choice.get("season_number")
+        if season_number is not None and not any(value.season_number==int(season_number) for value in item.seasons):raise ValueError("The selected season is not present in the latest complete Jellyfin scan.")
+        target_type=MappingTargetType.MOVIE_ITEM if item.library_kind==LibraryKind.MOVIE else (MappingTargetType.SERIES_SEASON if season_number is not None else MappingTargetType.SERIES_FOLDER)
+        content_kind=TrackingContentKind.MOVIE if item.library_kind==LibraryKind.MOVIE else (TrackingContentKind.SEASON if season_number is not None else TrackingContentKind.SERIES)
+        target=MappingTarget(target_type,item.library_kind,item.root_label,item.title,item.normalized_path,item.item_id,int(season_number) if season_number is not None else None,content_kind,inventory_snapshot_id(snapshot),item.title,PathState.EXISTS,("Manually selected from the latest read-only Jellyfin inventory.",))
+        service=MatchingService(MatchingRepository(self.profile.database_path));mapping=service.create_manual_mapping(anilist_id,target,profile_id=profile_id,user_note="Manually selected from Jellyfin inventory.")
+        with closing(sqlite3.connect(self.profile.database_path)) as connection:
+            connection.execute("UPDATE review_cases SET state='RESOLVED',resolution='Manual server mapping confirmed',updated_at=? WHERE profile_id=? AND anilist_id=? AND state IN ('OPEN','ACKNOWLEDGED')",(datetime.now(timezone.utc).isoformat(),profile_id,anilist_id));connection.commit()
+        now=datetime.now(timezone.utc);media=AniListCache(self.profile.database_path).get_media(anilist_id,now).media
+        if media is None:raise ValueError(f"AniList {anilist_id} is not available in the local cache.")
+        evaluations=service.check_confirmed_mappings(media,snapshot,aired_episode_count=_aired_episode_count(media),profile_id=profile_id);self._sync_tracking_state(anilist_id,evaluations,now)
+        evaluation=next((value for value in evaluations if value.mapping.mapping_id==mapping.mapping_id),None)
+        return {"mapping_id":mapping.mapping_id,"target":item.title,"season_number":target.season_number,"server_presence":evaluation.server_presence.value if evaluation else "UNKNOWN_COVERAGE"}
 
     def _persist(self,snapshot_id:str,snapshot:ServerInventorySnapshot,started:datetime,completed:datetime)->None:
         roots=[{"label":root.root.label,"library_kind":root.root.library_kind.value,"status":root.status.value} for root in snapshot.roots]
@@ -189,8 +272,8 @@ class ProductionInventoryOperations:
             if open_reviews:
                 reason="; ".join(value[0].replace("_"," ").title() for value in open_reviews)
                 connection.execute("UPDATE tracking_state SET tracker_status='Needs Review',server_presence='NEEDS_REVIEW',review_status='OPEN',review_reason=?,last_checked=? WHERE tracked_media_id=?",(reason,when.isoformat(),row[0]))
-            elif row[3]=="Needs Review":
-                tracker=_tracker_status(row[1],row[2],row[3])
+            else:
+                tracker=_tracker_status(row[1],row[2],row[3]) if row[3]=="Needs Review" else row[3]
                 connection.execute("UPDATE tracking_state SET tracker_status=?,server_presence='NOT_ON_SERVER',episode_coverage='NONE',review_status='NONE',review_reason='',last_checked=? WHERE tracked_media_id=?",(tracker,when.isoformat(),row[0]))
             connection.commit()
 

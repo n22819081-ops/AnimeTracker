@@ -4,6 +4,7 @@ import json
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime,timezone
 from pathlib import Path
 from typing import Iterator
 
@@ -67,6 +68,8 @@ class AnimeRow:
     present_episodes: int | None = None
     missing_episodes: tuple[int, ...] = ()
     mapping_state: str = "Not mapped"
+    cache_stale: bool = False
+    cache_error: str = ""
 
     @property
     def searchable(self) -> str:
@@ -112,7 +115,8 @@ class ModernRepository:
                 SELECT tm.anilist_id,tm.archived_at,tm.legacy_payload_json,
                        am.media_format,am.season_name,am.season_year,am.episode_count,am.anilist_status,
                        am.cover_image_url,am.page_url,am.source_updated_at,
-                       ac.normalized_payload_json,
+                       ac.normalized_payload_json,ac.retrieved_at cache_retrieved_at,
+                       ac.stale cache_stale,ac.last_error_message cache_error,
                        ts.tracker_status,ts.server_presence,ts.episode_coverage,
                        ts.review_status,ts.review_reason,
                        t.english,t.romaji,t.native,t.synonyms,
@@ -212,7 +216,8 @@ class ModernRepository:
                 SELECT r.*,t.english,t.romaji,t.native,tm.legacy_payload_json,
                        am.media_format,am.season_name,am.season_year,
                        ts.tracker_status,ts.server_presence server_status,
-                       m.display_name current_mapping,m.target_type mapping_scope,m.season_number mapping_season
+                       COALESCE(NULLIF(m.display_name,''),NULLIF(m.relative_path,'')) current_mapping,
+                       m.target_type mapping_scope,m.season_number mapping_season
                   FROM review_cases r
                   LEFT JOIN titles t ON t.anilist_id=r.anilist_id
                   LEFT JOIN tracked_media tm ON tm.anilist_id=r.anilist_id
@@ -239,7 +244,21 @@ class ModernRepository:
             try:value["reason"]="; ".join(json.loads(row["evidence_json"] or "[]"))
             except (TypeError,ValueError):value["reason"]=str(row["evidence_json"] or "")
             result.append(value)
-        return tuple(result)
+        grouped={}
+        severity_rank={"LOW":0,"MEDIUM":1,"HIGH":2,"CRITICAL":3}
+        for value in result:
+            key=(value.get("profile_id") or "default",int(value["anilist_id"]))
+            if key not in grouped:
+                merged=dict(value);merged["review_ids"]=[value["review_id"]];merged["review_types"]=[value["review_type"]];merged["reasons"]=[value.get("reason") or value.get("review_type","").replace("_"," ").title()];merged["candidates"]=list(value.get("candidates") or ());grouped[key]=merged;continue
+            merged=grouped[key];merged["review_ids"].append(value["review_id"]);merged["review_types"].append(value["review_type"]);merged["reasons"].append(value.get("reason") or value.get("review_type","").replace("_"," ").title());merged["candidates"].extend(value.get("candidates") or ())
+            if severity_rank.get(str(value.get("severity") or "").upper(),0)>severity_rank.get(str(merged.get("severity") or "").upper(),0):merged["severity"]=value.get("severity")
+            if not merged.get("current_mapping") and value.get("current_mapping"):merged["current_mapping"]=value["current_mapping"]
+        output=[]
+        for merged in grouped.values():
+            merged["review_ids"]=tuple(dict.fromkeys(merged["review_ids"]));merged["review_types"]=tuple(dict.fromkeys(merged["review_types"]));merged["review_type"]=merged["review_types"][0] if len(merged["review_types"])==1 else "MULTIPLE_ISSUES"
+            merged["reason"]="; ".join(dict.fromkeys(reason for reason in merged["reasons"] if reason))
+            merged["candidates"]=tuple({item.get("candidate_id") or repr(sorted(item.items())):item for item in merged["candidates"]}.values());output.append(merged)
+        return tuple(output)
 
     def review_for_anime(self, anilist_id: int) -> dict | None:
         reviews=tuple(row for row in self.review_rows() if int(row["anilist_id"])==int(anilist_id))
@@ -293,6 +312,23 @@ class ModernRepository:
             scopes=tuple(f"Season {int(value['season_number']):02d}" if value.get("season_number") is not None else str(value.get("target_type") or "Unspecified").replace("_"," ").title() for value in linked)
             result.append({"display_name":item.get("title") or "Unnamed server folder","seasons":", ".join(f"Season {value:02d}" for value in seasons) or "None detected","mapped_titles":", ".join(value["title"] for value in linked) or "Not mapped","mapping_scopes":", ".join(scopes) or "Not mapped","unmapped":"No" if linked else "Yes","ambiguous_files":len(item.get("unrecognized_media") or ())})
         return tuple(result)
+
+    def server_folder_choices(self,media_format:str="")->tuple[dict,...]:
+        with self.connect() as connection:
+            snapshot=connection.execute("SELECT snapshot_id,inventory_json FROM inventory_snapshots WHERE complete=1 ORDER BY completed_at DESC LIMIT 1").fetchone()
+        if snapshot is None:return ()
+        choices=[]
+        for item in json.loads(snapshot["inventory_json"] or "[]"):
+            library=str(item.get("library_kind") or "UNKNOWN")
+            if media_format=="MOVIE" and library!="MOVIE":continue
+            if media_format!="MOVIE" and library=="MOVIE":continue
+            common={"inventory_snapshot_id":snapshot["snapshot_id"],"inventory_item_id":item.get("item_id",""),"display_name":item.get("title") or "Unnamed server folder","library_kind":library,"year":item.get("year"),"path":item.get("path",""),"normalized_path":item.get("normalized_path","")}
+            seasons=tuple(value for value in item.get("seasons") or () if value.get("season_number") is not None)
+            if library=="MOVIE":choices.append({**common,"season_number":None,"scope_label":"Movie"})
+            elif seasons:
+                for season in seasons:choices.append({**common,"season_number":int(season["season_number"]),"scope_label":f"Season {int(season['season_number']):02d}"})
+            else:choices.append({**common,"season_number":None,"scope_label":"Whole series (coverage unknown)"})
+        return tuple(sorted(choices,key=lambda value:(str(value["display_name"]).casefold(),value["season_number"] if value["season_number"] is not None else -1)))
 
     def history_rows(self) -> tuple[dict, ...]:
         with self.connect() as connection:
@@ -386,15 +422,23 @@ class ModernRepository:
         aired=coverage.get("aired_episode_count",evidence.get("aired_episode_count"))
         if aired is None and (row["anilist_status"] or cached.get("status"))=="FINISHED":aired=expected
         elif aired is None and next_airing.get("episode") is not None:aired=max(0,int(next_airing["episode"])-1)
+        next_episode=str(next_airing.get("episode") or payload.get("next_airing_episode") or "")
+        next_airing_value=next_airing.get("airingAt")
+        if next_airing_value:
+            try:
+                airing=datetime.fromtimestamp(int(next_airing_value),timezone.utc).astimezone()
+                if bool(row["cache_stale"]) and airing<=datetime.now().astimezone():next_episode=f"Last known Ep {next_episode} · cached schedule expired"
+                else:next_episode=f"Ep {next_episode} · {airing.strftime('%b %d, %Y %I:%M %p')}"
+            except (TypeError,ValueError,OverflowError,OSError):pass
         return AnimeRow(
             row["anilist_id"],title,romaji,native,row["media_format"] or cached.get("format") or "UNKNOWN",
             row["season_name"] or cached.get("season") or "",row["season_year"] or cached.get("seasonYear"),
             row["anilist_status"] or cached.get("status") or "UNKNOWN",row["tracker_status"] or "Unknown",
             server_presence,row["episode_coverage"] or "UNKNOWN",
-            str(next_airing.get("episode") or payload.get("next_airing_episode") or ""),row["review_status"] or "",
-            row["source_updated_at"] or "",row["cover_image_url"] or cached_cover.get("extraLarge") or cached_cover.get("large") or cached_cover.get("medium") or "",
+            next_episode,row["review_status"] or "",
+            row["cache_retrieved_at"] or row["source_updated_at"] or "",row["cover_image_url"] or cached_cover.get("extraLarge") or cached_cover.get("large") or cached_cover.get("medium") or "",
             mapping_label,relation_label,bool(row["archived_at"]),english,synonyms,row["episode_count"] or cached.get("episodes"),
             str(next_airing.get("airingAt") or ""),row["page_url"] or cached.get("siteUrl") or "",row["review_reason"] or "",relations,
             expected,aired,
-            len(coverage.get("present_episode_numbers",())) if coverage.get("present_episode_numbers") is not None else evidence.get("present_episode_count"),missing,mapping_state,
+            len(coverage.get("present_episode_numbers",())) if coverage.get("present_episode_numbers") is not None else evidence.get("present_episode_count"),missing,mapping_state,bool(row["cache_stale"]),row["cache_error"] or "",
         )

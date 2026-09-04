@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from datetime import datetime, timedelta, timezone
 from typing import Iterable, Mapping
 
@@ -51,6 +52,7 @@ class AniListService:
         force_refresh: bool = False,
         offline: bool = False,
         token: Cancellation | None = None,
+        cache_connection: sqlite3.Connection | None = None,
     ) -> AniListRefreshResult:
         started = self.clock()
         if not isinstance(anilist_id, int) or anilist_id <= 0:
@@ -90,7 +92,7 @@ class AniListService:
             media = parse_media(payload, self.clock())
             if media.anilist_id != anilist_id:
                 raise AniListServiceError(AniListErrorType.MALFORMED_RESPONSE, "AniList returned a different media identity.", False)
-            self.cache.put_media(media, self.clock())
+            self.cache.put_media(media, self.clock(), connection=cache_connection)
             return AniListRefreshResult(
                 anilist_id, True, False, True, media,
                 rate_limit_state=response.rate_limit_state,

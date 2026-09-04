@@ -46,8 +46,8 @@ class AddAnimeDialog(QDialog):
         try:
             try: results=tuple(self.search_provider(text,self.year.value() or None,format_value,page=self.page))
             except TypeError: results=tuple(self.search_provider(text,self.year.value() or None,format_value))
-        except Exception:
-            self.status.setText("AniList is temporarily unavailable. The entered text has been preserved."); return
+        except Exception as exc:
+            self._search_error(type(exc).__name__,str(exc)); return
         self._show_results(results)
 
     def _show_results(self,results):
@@ -61,7 +61,11 @@ class AddAnimeDialog(QDialog):
         self.status.setText("No AniList matches found." if not results else f"{len(results)} possible matches. Select one before adding.")
 
     def _search_error(self,kind,detail):
-        self.status.setText(f"AniList is temporarily unavailable ({kind}). The entered text has been preserved.")
+        safe_detail=str(detail or "").split(": ",1)[-1].strip()
+        if kind=="AniListServiceError" and safe_detail:
+            self.status.setText(f"{safe_detail} The entered text has been preserved.")
+        else:
+            self.status.setText(f"AniList is temporarily unavailable ({kind}). The entered text has been preserved.")
 
     def change_page(self,delta):
         self.page=max(1,self.page+delta); self.run_search(keep_page=True)
@@ -72,7 +76,7 @@ class AddAnimeDialog(QDialog):
         from PySide6.QtWidgets import QListWidgetItem
         selected=self.results.item(rows[0].row(),1).data(Qt.UserRole)
         for relation in selected.get("related",()):
-            item=QListWidgetItem(f"{relation.get('title','Related anime')} · {relation.get('format','')} · {relation.get('year','')}")
+            item=QListWidgetItem(f"{relation.get('relation','Related').replace('_',' ').title()}: {relation.get('title','Related anime')} · {relation.get('format','')} · {relation.get('year','')} · {relation.get('status','')}")
             item.setFlags(item.flags()|Qt.ItemIsUserCheckable); item.setCheckState(Qt.Unchecked); item.setData(Qt.UserRole,relation); self.related.addItem(item)
 
     def selected_entries(self):
@@ -121,6 +125,7 @@ class MatchingReviewDialog(QDialog):
     suppress_auto_match_requested = Signal(dict)
     confirm_candidate_requested = Signal(dict,dict)
     reject_candidate_requested = Signal(dict,dict)
+    choose_folder_requested = Signal(dict)
 
     def __init__(self,review:dict,parent=None):
         super().__init__(parent); self.review=review; self.setWindowTitle("Review Server Match"); self.resize(980,680); self._prepared_candidates=tuple(review.get("candidates",()))
@@ -151,9 +156,9 @@ class MatchingReviewDialog(QDialog):
         if has_candidates:
             self.confirm=buttons.addButton("Confirm Suggestion",QDialogButtonBox.ActionRole); self.confirm.setEnabled(not self.stale); self.reject_candidate=buttons.addButton("Reject Candidate",QDialogButtonBox.DestructiveRole)
             self.confirm.clicked.connect(self._confirm_selected);self.reject_candidate.clicked.connect(self._reject_selected)
-        self.choose_folder=buttons.addButton("Choose Folder Manually",QDialogButtonBox.ActionRole); self.choose_folder.setEnabled(False); self.choose_folder.setToolTip("Manual folder selection is not available in this packaged build.")
+        self.choose_folder=buttons.addButton("Choose Folder Manually",QDialogButtonBox.ActionRole); self.choose_folder.setToolTip("Choose a folder or season discovered by the latest read-only Jellyfin scan.")
         self.mark_not_on_server=buttons.addButton("Mark Not on Server",QDialogButtonBox.ActionRole); self.suppress_auto_match=buttons.addButton("Suppress Automatic Matching",QDialogButtonBox.ActionRole); buttons.addButton(QDialogButtonBox.Cancel)
-        self.mark_not_on_server.clicked.connect(lambda:self.mark_not_on_server_requested.emit(self.review)); self.suppress_auto_match.clicked.connect(lambda:self.suppress_auto_match_requested.emit(self.review)); buttons.accepted.connect(self.accept); buttons.rejected.connect(self.reject); layout.addWidget(buttons)
+        self.choose_folder.clicked.connect(lambda:self.choose_folder_requested.emit(self.review)); self.mark_not_on_server.clicked.connect(lambda:self.mark_not_on_server_requested.emit(self.review)); self.suppress_auto_match.clicked.connect(lambda:self.suppress_auto_match_requested.emit(self.review)); buttons.accepted.connect(self.accept); buttons.rejected.connect(self.reject); layout.addWidget(buttons)
 
     def show_action_error(self,message:str)->None:
         self.notice.setText(message);self.notice.setObjectName("profileBanner");self.notice.style().unpolish(self.notice);self.notice.style().polish(self.notice)
@@ -179,6 +184,34 @@ class MatchingReviewDialog(QDialog):
 
     def _technical_toggled(self,visible:bool):
         self.technical_details.setVisible(visible)
+
+
+class ServerFolderDialog(QDialog):
+    def __init__(self,choices,parent=None):
+        super().__init__(parent);self.setWindowTitle("Select Jellyfin Folder");self.resize(900,560);self._choices=tuple(choices)
+        layout=QVBoxLayout(self);layout.addWidget(QLabel("Choose the exact folder and season for this AniList entry. This creates only a tracker mapping; Jellyfin files remain read-only."))
+        self.search=QLineEdit();self.search.setPlaceholderText("Search discovered folders");layout.addWidget(self.search)
+        self.table=QTableWidget(0,5);self.table.setHorizontalHeaderLabels(["Folder","Library","Season scope","Year","Exact path"]);self.table.setSelectionBehavior(QAbstractItemView.SelectRows);self.table.setSelectionMode(QAbstractItemView.SingleSelection);self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        for column,width in enumerate((250,90,130,80,360)):self.table.setColumnWidth(column,width)
+        layout.addWidget(self.table,1);self.search.textChanged.connect(self._filter);self.table.itemDoubleClicked.connect(lambda *_:self.accept() if self.selected_choice() else None)
+        buttons=QDialogButtonBox(QDialogButtonBox.Ok|QDialogButtonBox.Cancel);self.ok=buttons.button(QDialogButtonBox.Ok);self.ok.setText("Use Selected Folder");self.ok.setEnabled(False);buttons.accepted.connect(self.accept);buttons.rejected.connect(self.reject);self.table.itemSelectionChanged.connect(lambda:self.ok.setEnabled(bool(self.table.selectionModel().selectedRows())));layout.addWidget(buttons)
+        self._filter("")
+
+    def _filter(self,text):
+        query=str(text).casefold().strip();self.table.setRowCount(0)
+        for choice in self._choices:
+            values=(choice.get("display_name",""),choice.get("library_kind",""),choice.get("scope_label",""),choice.get("year") or "",choice.get("path",""))
+            if query and query not in " ".join(map(str,values)).casefold():continue
+            row=self.table.rowCount();self.table.insertRow(row)
+            for column,value in enumerate(values):self.table.setItem(row,column,QTableWidgetItem(str(value)))
+            self.table.item(row,0).setData(Qt.UserRole,choice)
+        if self.table.rowCount()==1:
+            self.table.selectRow(0);self.table.scrollToItem(self.table.item(0,0));self.ok.setEnabled(True)
+        else:self.ok.setEnabled(False)
+
+    def selected_choice(self):
+        rows=self.table.selectionModel().selectedRows()
+        return self.table.item(rows[0].row(),0).data(Qt.UserRole) if rows else None
 
 
 class LegacyImportPreviewDialog(QDialog):

@@ -7,6 +7,7 @@ from datetime import datetime,timezone
 from ..notifications_v2.discord import DiscordDeliveryAdapter
 from ..notifications_v2.enums import ChannelPurpose,DeliveryResultType
 from ..notifications_v2.models import NotificationMessage
+from ..notifications_v2.manual import ManualAnnouncementRepository
 from .credentials import DpapiCredentialStore,PRIVATE_REFERENCE,SHARED_REFERENCE
 from .profile import ProductionProfile
 
@@ -38,3 +39,20 @@ class ProductionNotificationActivation:
         if not approved:raise PermissionError("A Discord test requires explicit approval.")
         reference=PRIVATE_REFERENCE if purpose==ChannelPurpose.PRIVATE_TRACKER else SHARED_REFERENCE
         secret=self.store.retrieve_secret(reference).reveal();message=NotificationMessage(f"production-test-{purpose.value}",purpose,"Anime Tracker Production Test",f"Explicit test for {purpose.value}. No anime event or baseline change is created.",timestamp=datetime.now(timezone.utc));return self.adapter.deliver(secret,message)
+
+
+class ProductionManualAnnouncementService:
+    def __init__(self,profile:ProductionProfile,store=None,adapter=None,repository=None)->None:self.profile=profile;self.store=store or DpapiCredentialStore(profile.credentials_dir);self.adapter=adapter or DiscordDeliveryAdapter();self.repository=repository or ManualAnnouncementRepository(profile.database_path)
+
+    def send_new_on_server(self,items,*,approved:bool,cancel=None)->dict:
+        if not approved:raise PermissionError("A shared announcement requires explicit approval.")
+        safe_items=tuple({"anilist_id":int(item["anilist_id"]),"title":str(item["title"]).strip()} for item in items if str(item.get("title") or "").strip())
+        if not safe_items:raise ValueError("Select at least one title to announce.")
+        now=datetime.now(timezone.utc);draft_id=self.repository.create_draft("New on Jellyfin",safe_items,now);self.repository.set_status(draft_id,"PENDING",now)
+        body="\n".join(f"• {item['title']}" for item in safe_items);message=NotificationMessage(f"manual-{draft_id}",ChannelPurpose.SHARED_ANNOUNCEMENT,"New on Jellyfin",body,timestamp=now,silent=True)
+        try:
+            secret=self.store.retrieve_secret(SHARED_REFERENCE).reveal();result=self.adapter.deliver(secret,message,cancel=cancel)
+        except Exception:
+            self.repository.set_status(draft_id,"FAILED",datetime.now(timezone.utc));raise
+        delivered=result.result==DeliveryResultType.DELIVERED;self.repository.set_status(draft_id,"DELIVERED" if delivered else ("CANCELED" if result.result==DeliveryResultType.CANCELED else "FAILED"),datetime.now(timezone.utc))
+        return {"draft_id":draft_id,"delivered":delivered,"result":result.result.value,"error":result.error_summary or result.error_type,"titles":len(safe_items)}

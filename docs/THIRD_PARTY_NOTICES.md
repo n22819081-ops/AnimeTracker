@@ -15,4 +15,4 @@ Anime Tracker 1.0.0 bundles these runtime components. Their licenses remain cont
 | PyInstaller | 6.21.0 | GPL-2.0-or-later with bootloader exception |
 | Inno Setup | 6.7.3 | Inno Setup License; build tool, not an installed runtime |
 
-Qt TLS plugins include Windows Schannel plus the OpenSSL backend and bundled OpenSSL 3 libraries. The public release contains only dependencies selected by PyInstaller analysis; tests and development tools are excluded.
+Qt TLS plugins include the Windows-native Schannel and certificate-only backends. Qt's OpenSSL TLS plugin is excluded to prevent unrelated PATH entries from introducing an incompatible OpenSSL runtime. Python's bundled OpenSSL libraries remain for `requests`; they are loaded from the application's private runtime directory. The public release contains only dependencies selected by PyInstaller analysis; tests and development tools are excluded.

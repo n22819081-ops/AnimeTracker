@@ -11,7 +11,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$Root = "C:\AnimeTracker"
+$LegacyRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$Root = Split-Path -Parent $LegacyRoot
 $Python = Join-Path $Root ".venv\Scripts\pythonw.exe"
 
 if (-not (Test-Path $Python)) {
@@ -19,7 +20,7 @@ if (-not (Test-Path $Python)) {
 }
 
 if (-not (Test-Path $Python)) {
-    throw "Virtual environment not found under C:\AnimeTracker\.venv. Run C:\AnimeTracker\Install.ps1 first."
+    throw "Virtual environment not found under $Root\.venv. Run $Root\Install.ps1 first."
 }
 
 $Action = New-ScheduledTaskAction `

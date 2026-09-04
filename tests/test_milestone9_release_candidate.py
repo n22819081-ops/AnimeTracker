@@ -18,6 +18,9 @@ from anime_tracker.production.credentials import SecretValue
 from anime_tracker.production.profile import ProductionProfile
 from anime_tracker.runtime import APP_VERSION, BUILD_IDENTIFIER, SCHEMA_VERSION, validate_profile_override
 
+ROOT=Path(__file__).parents[1]
+MODERN_ROOT=ROOT/"Modern Anime Tracker"
+
 
 def _counts(path: Path) -> dict[str, int]:
     with sqlite3.connect(path) as connection:
@@ -30,10 +33,10 @@ def _counts(path: Path) -> dict[str, int]:
 
 
 def test_release_version_is_consistent():
-    root=Path(__file__).parents[1]
+    root=ROOT
     assert (APP_VERSION,BUILD_IDENTIFIER,SCHEMA_VERSION)==("1.0.0","1.0.0-rc1",6)
     assert 'version = "1.0.0"' in (root/"pyproject.toml").read_text(encoding="utf-8")
-    assert '#define MyAppVersion "1.0.0"' in (root/"packaging"/"AnimeTracker.iss").read_text(encoding="utf-8")
+    assert '#define MyAppVersion "1.0.0"' in (MODERN_ROOT/"packaging"/"AnimeTracker.iss").read_text(encoding="utf-8")
 
 
 def test_clean_profile_is_empty_safe_and_schema_current(tmp_path):
@@ -115,7 +118,7 @@ def test_diagnostics_and_smoke_test_entry_points(qtbot,tmp_path,capsys):
 
 
 def test_packaging_is_windowed_per_user_and_preserves_data():
-    root=Path(__file__).parents[1];spec=(root/"packaging"/"anime_tracker.spec").read_text(encoding="utf-8");installer=(root/"packaging"/"AnimeTracker.iss").read_text(encoding="utf-8")
+    root=MODERN_ROOT;spec=(root/"packaging"/"anime_tracker.spec").read_text(encoding="utf-8");installer=(root/"packaging"/"AnimeTracker.iss").read_text(encoding="utf-8")
     assert "console=False" in spec and "name='Anime Tracker'" in spec and "PySide6.QtNetwork" in spec
     hook=(root/"packaging"/"hooks"/"hook-PySide6.QtNetwork.py").read_text(encoding="utf-8")
     assert "add_qt6_dependencies" in hook and "collect_qtnetwork_files" not in hook
@@ -131,7 +134,7 @@ def test_packaged_sources_have_no_shell_eval_or_reset_profile():
 
 
 def test_release_artifact_names():
-    tools=(Path(__file__).parents[1]/"packaging"/"release_tools.py").read_text(encoding="utf-8")
+    tools=(MODERN_ROOT/"packaging"/"release_tools.py").read_text(encoding="utf-8")
     assert "Anime-Tracker-Setup-{APP_VERSION}.exe" in tools
     assert "Anime-Tracker-Portable-{APP_VERSION}.zip" in tools
 
@@ -155,19 +158,19 @@ def test_qt_network_ignores_msys_openssl_collision(tmp_path):
     assert result.stdout.strip()=="schannel"
 
 
-@pytest.mark.skipif(not (Path(__file__).parents[1]/"packaging"/"installer-staging"/"Anime Tracker.bin").is_file(),reason="release build not present")
+@pytest.mark.skipif(not (MODERN_ROOT/"packaging"/"installer-staging"/"Anime Tracker.bin").is_file(),reason="release build not present")
 def test_built_pe_has_version_icon_and_windowed_subsystem():
     import pefile
-    root=Path(__file__).parents[1];pe=pefile.PE(str(root/"packaging"/"installer-staging"/"Anime Tracker.bin"))
+    root=MODERN_ROOT;pe=pefile.PE(str(root/"packaging"/"installer-staging"/"Anime Tracker.bin"))
     assert pe.OPTIONAL_HEADER.Subsystem==2
     assert pe.VS_FIXEDFILEINFO[0].FileVersionMS==(1<<16)
     resource_ids={entry.id for entry in pe.DIRECTORY_ENTRY_RESOURCE.entries}
     assert 3 in resource_ids and 16 in resource_ids
 
 
-@pytest.mark.skipif(not (Path(__file__).parents[1]/"dist"/"Anime Tracker").is_dir(),reason="release build not present")
+@pytest.mark.skipif(not (MODERN_ROOT/"dist"/"Anime Tracker").is_dir(),reason="release build not present")
 def test_built_distribution_has_required_runtime_plugins_and_no_user_data():
-    root=Path(__file__).parents[1];dist=root/"dist"/"Anime Tracker";plugins=dist/"_internal"/"PySide6"/"plugins"
+    root=MODERN_ROOT;dist=root/"dist"/"Anime Tracker";plugins=dist/"_internal"/"PySide6"/"plugins"
     for path in (plugins/"platforms"/"qwindows.dll",plugins/"imageformats"/"qjpeg.dll",plugins/"styles"/"qmodernwindowsstyle.dll",plugins/"tls"/"qschannelbackend.dll",dist/"_internal"/"sqlite3.dll",dist/"_internal"/"Create-ModernScheduledTask.ps1"):assert path.is_file()
     names={path.name.casefold() for path in dist.rglob("*") if path.is_file()}
     assert not any(name.endswith((".db",".sqlite")) for name in names)
@@ -175,10 +178,10 @@ def test_built_distribution_has_required_runtime_plugins_and_no_user_data():
     assert not ({"logs","backups","production_profile"}&{path.name.casefold() for path in dist.rglob("*")})
 
 
-@pytest.mark.skipif(not (Path(__file__).parents[1]/"release"/"1.0.0"/"Anime-Tracker-Portable-1.0.0.zip").is_file(),reason="release build not present")
+@pytest.mark.skipif(not (MODERN_ROOT/"release"/"1.0.0"/"Anime-Tracker-Portable-1.0.0.zip").is_file(),reason="release build not present")
 def test_portable_zip_matches_onedir_and_has_no_python_source_or_profile():
     import zipfile
-    path=Path(__file__).parents[1]/"release"/"1.0.0"/"Anime-Tracker-Portable-1.0.0.zip"
+    path=MODERN_ROOT/"release"/"1.0.0"/"Anime-Tracker-Portable-1.0.0.zip"
     with zipfile.ZipFile(path) as archive:
         names=archive.namelist();assert archive.testzip() is None and len(names)==223
     assert "Anime Tracker/Anime Tracker.exe" in names

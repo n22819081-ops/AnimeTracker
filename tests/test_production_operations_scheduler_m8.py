@@ -84,7 +84,7 @@ def test_scheduled_before_migration_returns_failed_without_creating_database(tmp
 
 
 def test_scheduler_script_is_validation_only_limited_and_keeps_legacy(tmp_path):
-    source=(Path(__file__).parents[1]/"Create-ModernScheduledTask.ps1").read_text(encoding="utf-8")
+    source=(Path(__file__).parents[1]/"Modern Anime Tracker"/"Create-ModernScheduledTask.ps1").read_text(encoding="utf-8")
     assert 'Anime Tracker Modern - Validation' in source and '-RunLevel Limited' in source and 'MultipleInstances IgnoreNew' in source
     assert 'Disable-ScheduledTask -TaskName $TaskName' in source
     assert 'Anime Tracker Weekly Check' not in source and 'Unregister-ScheduledTask' not in source

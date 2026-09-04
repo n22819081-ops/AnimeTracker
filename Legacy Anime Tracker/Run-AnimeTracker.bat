@@ -1,6 +1,6 @@
 @echo off
 setlocal
-set "ROOT=%~dp0"
+for %%I in ("%~dp0..") do set "ROOT=%%~fI\"
 set "PYTHON=%ROOT%.venv\Scripts\pythonw.exe"
 if not exist "%PYTHON%" set "PYTHON=%ROOT%.venv\Scripts\python.exe"
 if not exist "%PYTHON%" (
@@ -8,5 +8,5 @@ if not exist "%PYTHON%" (
     pause
     exit /b 1
 )
-start "Anime Tracker" /D "%ROOT%" "%PYTHON%" -m anime_tracker.app
+start "Anime Tracker" /D "%ROOT%" "%PYTHON%" -m anime_tracker.app %*
 endlocal

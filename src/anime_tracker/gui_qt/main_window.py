@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from .data import ModernRepository, TitleMetadata, resolve_display_title
-from .dialogs import AddAnimeDialog, AnimeDetailDialog, LegacyImportPreviewDialog, MatchingReviewDialog
+from .dialogs import AddAnimeDialog, AnimeDetailDialog, LegacyImportPreviewDialog, MatchingReviewDialog, ServerFolderDialog
 from .pages import (
     AnimeListPage, CoveragePage, DashboardPage, FranchisePage, HistoryPage, MoviesPage,
     NotificationsPage, ReviewPage, SettingsPage,
@@ -94,8 +94,9 @@ class MainWindow(QMainWindow):
                 page.row_activated.connect(self.open_detail)
                 widths=self.settings.get("table_columns",{}).get(name,())
                 for index,width in enumerate(widths[:page.table.model.columnCount()]):page.table.view.setColumnWidth(index,int(width))
-            if isinstance(page,FranchisePage):page.row_activated.connect(self.open_detail)
+            if isinstance(page,FranchisePage):page.row_activated.connect(self.open_detail);page.add_related_requested.connect(self._add_related)
             if isinstance(page,ReviewPage):page.review_requested.connect(self.open_review)
+            if isinstance(page,NotificationsPage):page.send_announcement_requested.connect(self._send_manual_announcement)
             if isinstance(page,SettingsPage):
                 page.theme_changed.connect(self.change_theme);page.preview_requested.connect(self.open_preview);page.reset_requested.connect(self.reset_profile)
                 if self.production:page.schedule_run_requested.connect(self.run_scheduled_now);page.schedule_install_requested.connect(self.install_validation_task);page.schedule_logs_requested.connect(self.show_scheduled_log)
@@ -152,14 +153,17 @@ class MainWindow(QMainWindow):
             self.task_status.setText(f"{label}: {result.get('succeeded',0)} succeeded, {result['failed']} failed")
         summary=_operation_summary(label,result)
         if "refresh" in label.casefold():self.last_refresh.setText(f"Last refresh: {result.get('completed_at','just now') if isinstance(result,dict) else 'just now'}")
-        else:self.last_scan.setText(f"Last scan: {result.get('completed_at','just now') if isinstance(result,dict) else 'just now'}")
+        elif "scan" in label.casefold():self.last_scan.setText(f"Last scan: {result.get('completed_at','just now') if isinstance(result,dict) else 'just now'}")
         self._refresh_pages();self.last_operation_summary=summary
         if self.production and summary:QMessageBox.information(self,f"{label} complete",summary)
     def _task_error(self,kind,detail):LOGGER.error("Background operation failed (%s): %s",kind,detail);self.progress.hide(); self.task_status.setText(f"Task failed: {kind}"); QMessageBox.warning(self,"Background task failed",f"The operation could not finish.\n\n{detail}")
 
     def open_add(self):
         provider=_production_search_provider(self.profile) if self.production else None
-        AddAnimeDialog(search_provider=provider,parent=self,background_search=self.production).exec()
+        dialog=AddAnimeDialog(search_provider=provider,parent=self,background_search=self.production)
+        if dialog.exec()!=dialog.Accepted:return
+        entries=dialog.selected_entries();ids=tuple(int(value["anilist_id"]) for value in entries if value.get("anilist_id"))
+        if self.production and ids:self._start_worker("Add anime",_production_add_entries,self.profile,ids)
     def open_detail(self,row):
         dialog=AnimeDetailDialog(row,self,details=self.repository.media_details(row.anilist_id))
         dialog.review_server_match_requested.connect(lambda value:self._review_from_detail(dialog,value))
@@ -175,8 +179,28 @@ class MainWindow(QMainWindow):
     def _franchise_from_detail(self,dialog,row):
         dialog.accept();self.navigation.setCurrentRow(PAGE_LABELS.index("Franchises"));self.search.setText(row.title)
 
+    def _add_related(self,anilist_id):
+        if not self.production:return
+        if QMessageBox.question(self,"Add related anime",f"Add AniList {anilist_id} to the tracker?\n\nThis does not create a Jellyfin mapping or modify media files.")!=QMessageBox.Yes:return
+        self._start_worker("Add related anime",_production_add_entries,self.profile,(int(anilist_id),))
+
     def open_review(self,review):
-        dialog=MatchingReviewDialog(review,self);dialog.mark_not_on_server_requested.connect(lambda value:self._mark_review_not_on_server(value,dialog));dialog.suppress_auto_match_requested.connect(lambda value:self._suppress_review_matching(value,dialog));dialog.confirm_candidate_requested.connect(lambda value,candidate:self._confirm_review_candidate(value,candidate,dialog));dialog.reject_candidate_requested.connect(lambda value,candidate:self._reject_review_candidate(value,candidate,dialog));dialog.exec()
+        dialog=MatchingReviewDialog(review,self);dialog.mark_not_on_server_requested.connect(lambda value:self._mark_review_not_on_server(value,dialog));dialog.suppress_auto_match_requested.connect(lambda value:self._suppress_review_matching(value,dialog));dialog.confirm_candidate_requested.connect(lambda value,candidate:self._confirm_review_candidate(value,candidate,dialog));dialog.reject_candidate_requested.connect(lambda value,candidate:self._reject_review_candidate(value,candidate,dialog));dialog.choose_folder_requested.connect(lambda value:self._choose_review_folder(value,dialog));dialog.exec()
+
+    def _choose_review_folder(self,review,review_dialog):
+        choices=self.repository.server_folder_choices(str(review.get("media_format") or ""))
+        if not choices:review_dialog.show_action_error("No compatible folders were found in the latest complete Jellyfin scan.");return
+        chooser=ServerFolderDialog(choices,review_dialog)
+        if chooser.exec()!=chooser.Accepted:return
+        choice=chooser.selected_choice()
+        if choice is None:return
+        try:
+            self._assert_active_profile()
+            from ..production.operations import ProductionInventoryOperations
+            result=ProductionInventoryOperations(self.profile).confirm_manual_target(int(review["anilist_id"]),choice,profile_id=str(review.get("profile_id") or "default"))
+        except Exception as exc:
+            LOGGER.exception("Manual folder confirmation failed for AniList %s",review.get("anilist_id"));review_dialog.show_action_error(f"Manual selection failed: {exc}");QMessageBox.warning(review_dialog,"Folder not selected",f"The folder mapping could not be saved.\n\n{exc}");return
+        self._refresh_pages();review_dialog.accept();season=f" · Season {result['season_number']:02d}" if result.get("season_number") is not None else "";QMessageBox.information(self,"Server folder selected",f"{result['target']}{season}\n\nJellyfin files were not modified.")
 
     def _confirm_review_candidate(self,review,candidate,dialog):
         if dialog.confirm:dialog.confirm.setEnabled(False)
@@ -207,11 +231,19 @@ class MainWindow(QMainWindow):
             from ..services.matching.repository import MatchingRepository
             from ..services.matching.service import MatchingService
             service=MatchingService(MatchingRepository(self.profile.database_path))
-            if review.get("review_id"):service.resolve_review_not_on_server(str(review["review_id"]),int(review["anilist_id"]),profile_id=str(review.get("profile_id") or "default"))
+            review_ids=tuple(review.get("review_ids") or ((review.get("review_id"),) if review.get("review_id") else ()))
+            if review_ids:
+                for review_id in review_ids:service.resolve_review_not_on_server(str(review_id),int(review["anilist_id"]),profile_id=str(review.get("profile_id") or "default"))
             else:service.mark_not_on_server(int(review["anilist_id"]),profile_id=str(review.get("profile_id") or "default"),reason="Manually confirmed not on the Jellyfin server.")
         except Exception as exc:
             LOGGER.exception("Mark Not on Server failed for AniList %s",review.get("anilist_id"));dialog.show_action_error(f"Mark Not on Server failed: {exc}");QMessageBox.warning(dialog,"Decision not saved",f"The decision could not be saved.\n\n{exc}");return
         self._refresh_pages();dialog.accept()
+
+    def _send_manual_announcement(self,items):
+        if not self.production or not items:return
+        titles="\n".join(f"• {item['title']}" for item in items)
+        if QMessageBox.question(self,"Send shared announcement",f"Send this message to the configured shared chat?\n\nNew on Jellyfin:\n{titles}\n\nOnly these titles will be sent. This cannot be undone from Anime Tracker.")!=QMessageBox.Yes:return
+        self._start_worker("Manual shared announcement",_production_send_announcement,self.profile,tuple(items))
 
     def _suppress_review_matching(self,review,dialog):
         try:
@@ -295,7 +327,15 @@ def _operation_summary(label,result)->str:
     if "inventory scan" in label.casefold():
         stats=result.get("statistics",{})
         return "\n".join(("Jellyfin scan complete",f"{result.get('item_count',0)} library items",f"{stats.get('files_seen',0)} files",f"{stats.get('media_files_seen',0)} media files",f"{result.get('candidate_suggestions',0)} candidate suggestions",f"{result.get('mappings_revalidated',0)} mappings revalidated","0 mappings auto-confirmed",f"{result.get('review_cases',0)} review cases"))
+    if label.casefold().startswith("add "):
+        return "\n".join(("Tracker update complete",f"{result.get('added',0)} added",f"{result.get('existing',0)} already tracked",f"{result.get('failed',0)} failed","No Jellyfin files were modified"))
+    if label=="Manual shared announcement":return "Shared chat announcement delivered." if result.get("delivered") else f"Announcement was not delivered: {result.get('error','controlled delivery failure')}"
     return ""
+
+
+def _production_send_announcement(profile,items,*,cancel_event,progress):
+    from ..production.notifications import ProductionManualAnnouncementService
+    progress(0,1,"Sending explicitly approved shared announcement");result=ProductionManualAnnouncementService(profile).send_new_on_server(items,approved=True,cancel=cancel_event);progress(1,1,"Shared announcement delivery finished");return result
 
 
 def _production_scheduled_check(profile,*,cancel_event,progress):
@@ -315,8 +355,15 @@ def _production_search_provider(profile):
         from ..domain.enums import MediaKind
         media_format=MediaKind(format_value) if format_value else None
         values=service.search_media(query,year=year,media_format=media_format,page=page)
-        return tuple({"anilist_id":item.anilist_id,"title":resolve_display_title(TitleMetadata(item.anilist_id,item.title.english,item.title.romaji,item.title.native,item.title.primary)),"alternate_title":" / ".join(value for value in (item.title.romaji,item.title.native) if value),"format":item.media_format.value,"year":item.season_year,"status":item.status.value,"episodes":item.episode_count,"cover_url":item.cover_images.medium,"related":tuple({"anilist_id":relation.target_anilist_id,"title":relation.target_title or f"AniList {relation.target_anilist_id}","format":relation.target_format.value,"year":"","relation":relation.relation_type.value} for relation in item.relations if relation.target_anilist_id)} for item in values)
+        return tuple({"anilist_id":item.anilist_id,"title":resolve_display_title(TitleMetadata(item.anilist_id,item.title.english,item.title.romaji,item.title.native,item.title.primary)),"alternate_title":" / ".join(value for value in (item.title.romaji,item.title.native) if value),"format":item.media_format.value,"year":item.season_year,"status":item.status.value,"episodes":item.episode_count,"cover_url":item.cover_images.medium,"related":tuple({"anilist_id":relation.target_anilist_id,"title":relation.target_title or f"AniList {relation.target_anilist_id}","format":relation.target_format.value,"year":relation.target_year or "","status":relation.target_status.value,"episodes":relation.target_episode_count,"relation":relation.relation_type.value} for relation in item.relations if relation.target_anilist_id)} for item in values)
     return provider
+
+
+def _production_add_entries(profile,ids,*,cancel_event,progress):
+    from ..production.operations import ProductionAniListOperations
+    progress(0,len(ids),"Adding confirmed AniList identities")
+    result=ProductionAniListOperations(profile).add_tracked_media(ids,token=cancel_event)
+    progress(len(ids),len(ids),f"Added {result['added']} title(s)");return result
 
 
 def _production_root_settings(profile):

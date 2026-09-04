@@ -99,6 +99,8 @@ Keep the current database and retain the verified backup. No restoration is just
 
 The legacy database changed after the earlier Milestone 8 hash was recorded: its SHA-256 is now `69763FC9EC883096041C6EDEDD9399B4697EBC650A48D07BA87879C787B3782E`, with a last-write time of 14:03:04 UTC. The existing legacy log explains this: its already-configured scheduled task ran from 10:00:01 through 10:03:05 local time today, made its scheduled backup and status updates, and sent its configured Discord summary. This occurred before this audit and was not triggered by it. No Task Scheduler configuration was changed.
 
+The next already-configured scheduled check ran on 2026-08-09 from 10:00:01 through 10:02:07 local time. The pre-run backup `anime_tracker-scheduled-check-20260809-100001.db` retains the prior hash above, while the post-run legacy database is 704,512 bytes with SHA-256 `0CBA84F7D08EAD16A69C1DF49D0A79A8351940A4D28E8049C60E591A1176BEB8`. The log records 66 titles updated, six moved to ready, zero moved on server, and a successful scheduled summary. The safety-test checkpoint was advanced to this audited post-run hash; the database itself was not changed or replaced during the checkpoint update.
+
 That legacy activity is independent of the modern database comparison: the modern database remained at `686BE777398D98800DB468ABB7BFA4553323850292A8F69794A8256341A9A181` throughout this audit. No automatic restoration or other corrective action was taken.
 
 The machine-readable normalized comparison is in `docs/PRODUCTION_DATABASE_HASH_CHANGE_AUDIT.json`.

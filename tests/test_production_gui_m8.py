@@ -31,6 +31,6 @@ def test_completed_migration_opens_production_window_with_disabled_activation(qt
 
 
 def test_launcher_has_explicit_test_reset_and_no_broad_reset():
-    root=Path(__file__).parents[1];script=(root/"Run-AnimeTracker-Modern.ps1").read_text(encoding="utf-8");application=(root/"src"/"anime_tracker"/"gui_qt"/"application.py").read_text(encoding="utf-8")
+    root=Path(__file__).parents[1];script=(root/"Modern Anime Tracker"/"Run-AnimeTracker-Modern.ps1").read_text(encoding="utf-8");application=(root/"src"/"anime_tracker"/"gui_qt"/"application.py").read_text(encoding="utf-8")
     assert "--reset-test-profile" in application and "--test-profile" in application
     assert '"--reset-profile"' in script and "was removed" in script
