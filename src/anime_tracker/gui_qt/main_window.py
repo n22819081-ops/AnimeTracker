@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+import datetime
 from collections import OrderedDict
 
 from PySide6.QtCore import QByteArray, Qt, QThreadPool, Signal
@@ -311,7 +312,7 @@ def _simulated_operation(steps:int,*,cancel_event,progress):
 def _production_refresh(profile,*,cancel_event,progress):
     from ..production.operations import ProductionAniListOperations
     operation=ProductionAniListOperations(profile);preview=operation.preview();progress(0,preview["count"],f"Preparing {preview['count']} active AniList identities")
-    result=operation.refresh(token=cancel_event,baseline=False);result["completed_at"]=__import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat();progress(result["succeeded"]+result["failed"],preview["count"],f"{result['succeeded']} refreshed, {result['failed']} failed");return result
+    result=operation.refresh(token=cancel_event,baseline=False);result["completed_at"]=datetime.datetime.now(datetime.timezone.utc).isoformat();progress(result["succeeded"]+result["failed"],preview["count"],f"{result['succeeded']} refreshed, {result['failed']} failed");return result
 
 
 def _production_scan(profile,*,cancel_event,progress):

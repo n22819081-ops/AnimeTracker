@@ -10,8 +10,8 @@ DB_PATH = DATA_DIR / "anime_tracker.db"
 LOG_DIR = LEGACY_DIR / "logs"
 BACKUP_DIR = LEGACY_DIR / "backups"
 
-DEFAULT_TV_PATH = r"I:\Jellyfin_Media\TV-SHOWs"
-DEFAULT_MOVIE_PATH = r"I:\Jellyfin_Media\Movies"
+DEFAULT_TV_PATH = ""
+DEFAULT_MOVIE_PATH = ""
 
 TRACKER_UPCOMING = "Upcoming"
 TRACKER_AIRING = "Currently Airing"
