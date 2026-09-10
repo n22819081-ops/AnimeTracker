@@ -38,7 +38,7 @@ def test_manga_url_has_specific_non_outage_error(qtbot):
 def test_search_preview_cache_does_not_track_until_confirmed(tmp_path):
     profile=production_profile(tmp_path);value=media("A New Related Season",anilist_id=990001,year=2026)
     class Service:
-        def get_media(self,_anilist_id,token=None):return AniListRefreshResult(990001,True,False,True,value)
+        def get_media(self,_anilist_id,token=None,cache_connection=None):return AniListRefreshResult(990001,True,False,True,value)
     before=ModernRepository(profile.database_path).import_preview()["active_titles"]
     operation=ProductionAniListOperations(profile,Service())
     with sqlite3.connect(profile.database_path) as connection:
