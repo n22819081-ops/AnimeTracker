@@ -14,11 +14,11 @@ from PySide6.QtCore import QThreadPool
 
 from anime_tracker.gui_qt.workers import BackgroundWorker
 from anime_tracker.gui_qt.covers import CoverImageCache
+from live_database_checkpoint import LIVE_DATABASE_SHA256
 
 
 ROOT=Path(__file__).resolve().parents[1]
 LIVE=ROOT/"Legacy Anime Tracker"/"data"/"anime_tracker.db"
-LIVE_HASH="0CBA84F7D08EAD16A69C1DF49D0A79A8351940A4D28E8049C60E591A1176BEB8"
 
 
 def operation(steps=5,*,cancel_event,progress):
@@ -65,7 +65,7 @@ def test_gui_package_has_no_media_write_scheduler_or_credential_reads():
 
 
 def test_live_database_hash_unchanged():
-    assert hashlib.sha256(LIVE.read_bytes()).hexdigest().upper()==LIVE_HASH
+    assert hashlib.sha256(LIVE.read_bytes()).hexdigest().upper()==LIVE_DATABASE_SHA256
 
 
 def test_modern_launcher_is_separate_and_legacy_launchers_remain():

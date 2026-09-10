@@ -18,11 +18,11 @@ from anime_tracker.notifications_v2 import (
 )
 
 from notification_v2_helpers import NOW,event,message
+from live_database_checkpoint import LIVE_DATABASE_SHA256
 
 
 ROOT=Path(__file__).resolve().parents[1]
 LIVE=ROOT/"Legacy Anime Tracker"/"data"/"anime_tracker.db"
-LIVE_HASH="0CBA84F7D08EAD16A69C1DF49D0A79A8351940A4D28E8049C60E591A1176BEB8"
 V4=ROOT/"Modern Anime Tracker"/"migration_test"/"anime_tracker_modern_v4.db"
 
 
@@ -82,7 +82,7 @@ class SchemaV5Tests(unittest.TestCase):
 
     def test_live_database_migration_refused_and_hash_unchanged(self):
         with self.assertRaises(ValueError): migrate_modern_database_to_v5(LIVE,live_database_path=LIVE,protected_roots=())
-        self.assertEqual(hashlib.sha256(LIVE.read_bytes()).hexdigest().upper(),LIVE_HASH)
+        self.assertEqual(hashlib.sha256(LIVE.read_bytes()).hexdigest().upper(),LIVE_DATABASE_SHA256)
 
     def test_secret_absent_from_sqlite(self):
         with tempfile.TemporaryDirectory() as folder:

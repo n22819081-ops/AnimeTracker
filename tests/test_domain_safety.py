@@ -5,11 +5,12 @@ import hashlib
 import unittest
 from pathlib import Path
 
+from live_database_checkpoint import LIVE_DATABASE_SHA256
+
 
 ROOT = Path(__file__).resolve().parents[1]
 DOMAIN = ROOT / "src" / "anime_tracker" / "domain"
 LIVE_DB = ROOT / "Legacy Anime Tracker" / "data" / "anime_tracker.db"
-EXPECTED_LIVE_HASH = "0CBA84F7D08EAD16A69C1DF49D0A79A8351940A4D28E8049C60E591A1176BEB8"
 
 
 class DomainSafetyTests(unittest.TestCase):
@@ -50,7 +51,7 @@ class DomainSafetyTests(unittest.TestCase):
 
     def test_live_database_hash_matches_milestone_checkpoint(self):
         digest = hashlib.sha256(LIVE_DB.read_bytes()).hexdigest().upper()
-        self.assertEqual(digest, EXPECTED_LIVE_HASH)
+        self.assertEqual(digest, LIVE_DATABASE_SHA256)
 
 
 if __name__ == "__main__":

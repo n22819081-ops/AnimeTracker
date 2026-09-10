@@ -18,13 +18,13 @@ from anime_tracker.services.anilist.models import parse_media
 from anime_tracker.services.anilist.queries import MEDIA_BY_ID_QUERY
 
 from anilist_helpers import FIXTURE_ROOT, NOW, FakeResponse, client_for, fixture, media_response
+from live_database_checkpoint import LIVE_DATABASE_SHA256
 
 ROOT = Path(__file__).resolve().parents[1]
 MODERN_ROOT = ROOT / "Modern Anime Tracker"
 PROTOTYPE = MODERN_ROOT / "migration_test" / "anime_tracker_modern_v1.db"
 BACKUP_DB = MODERN_ROOT / "modernization_backups" / "20260801-230906-verified" / "sqlite_online" / "anime_tracker.db"
 LIVE_DB = ROOT / "Legacy Anime Tracker" / "data" / "anime_tracker.db"
-EXPECTED_LIVE_HASH = "0CBA84F7D08EAD16A69C1DF49D0A79A8351940A4D28E8049C60E591A1176BEB8"
 
 
 class SchemaV3Tests(unittest.TestCase):
@@ -147,7 +147,7 @@ class PrivacyAndSafetyTests(unittest.TestCase):
         self.assertNotIn("storage checker", joined)
 
     def test_live_database_hash_is_unchanged(self):
-        self.assertEqual(hashlib.sha256(LIVE_DB.read_bytes()).hexdigest().upper(), EXPECTED_LIVE_HASH)
+        self.assertEqual(hashlib.sha256(LIVE_DB.read_bytes()).hexdigest().upper(), LIVE_DATABASE_SHA256)
 
     def test_optional_live_check_is_disabled_by_default(self):
         with patch.dict("os.environ", {"ANIME_TRACKER_ANILIST_LIVE_CHECK": "0"}):

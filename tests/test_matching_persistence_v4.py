@@ -21,12 +21,12 @@ from anime_tracker.services.matching import (
 )
 
 from matching_helpers import NOW, inventory_item, media, snapshot
+from live_database_checkpoint import LIVE_DATABASE_SHA256
 
 
 ROOT = Path(__file__).resolve().parents[1]
 V3_PROTOTYPE = ROOT / "Modern Anime Tracker" / "migration_test" / "anime_tracker_modern_v3.db"
 LIVE_DB = ROOT / "Legacy Anime Tracker" / "data" / "anime_tracker.db"
-LIVE_HASH = "0CBA84F7D08EAD16A69C1DF49D0A79A8351940A4D28E8049C60E591A1176BEB8"
 
 
 class SchemaV4Tests(unittest.TestCase):
@@ -86,7 +86,7 @@ class SchemaV4Tests(unittest.TestCase):
     def test_live_database_migration_is_refused(self):
         with self.assertRaises(ValueError):
             migrate_modern_database_to_v4(LIVE_DB, live_database_path=LIVE_DB, protected_roots=())
-        self.assertEqual(hashlib.sha256(LIVE_DB.read_bytes()).hexdigest().upper(), LIVE_HASH)
+        self.assertEqual(hashlib.sha256(LIVE_DB.read_bytes()).hexdigest().upper(), LIVE_DATABASE_SHA256)
 
 
 class MatchingPersistenceTests(unittest.TestCase):

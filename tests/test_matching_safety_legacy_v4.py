@@ -9,13 +9,13 @@ import unittest
 from pathlib import Path
 
 from anime_tracker.modernization.schema_v4 import migrate_modern_database_to_v4
+from live_database_checkpoint import LIVE_DATABASE_SHA256
 
 
 ROOT = Path(__file__).resolve().parents[1]
 MATCHING = ROOT / "src" / "anime_tracker" / "services" / "matching"
 V3_PROTOTYPE = ROOT / "Modern Anime Tracker" / "migration_test" / "anime_tracker_modern_v3.db"
 LIVE_DB = ROOT / "Legacy Anime Tracker" / "data" / "anime_tracker.db"
-EXPECTED_LIVE_HASH = "0CBA84F7D08EAD16A69C1DF49D0A79A8351940A4D28E8049C60E591A1176BEB8"
 
 
 class MatchingSafetyTests(unittest.TestCase):
@@ -64,7 +64,7 @@ class MatchingSafetyTests(unittest.TestCase):
         self.assertIn("finally:\n            connection.close()", source)
 
     def test_live_database_hash_remains_milestone_checkpoint(self):
-        self.assertEqual(hashlib.sha256(LIVE_DB.read_bytes()).hexdigest().upper(), EXPECTED_LIVE_HASH)
+        self.assertEqual(hashlib.sha256(LIVE_DB.read_bytes()).hexdigest().upper(), LIVE_DATABASE_SHA256)
 
 
 class MatchingLegacyV4Tests(unittest.TestCase):
