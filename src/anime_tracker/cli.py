@@ -12,6 +12,8 @@ Commands:
     list                        List tracked anime (optionally --status X).
     reject <anilist id> <path>  Reject a candidate server path for one anime.
     remove <anilist id>         Remove an anime from the tracker.
+    seasons <anilist id>        List other seasons/movies of a show and which
+                                are already added to the tracker.
     health                      Check AniList reachability and DB size.
 
 All mutations go through the same Database methods the GUI uses, and every
@@ -156,6 +158,33 @@ def cmd_remove(args) -> int:
     return 0
 
 
+def cmd_seasons(args) -> int:
+    from .anilist import AniListClient
+    from .seasons import find_franchise_entries, mark_tracked_entries, tracked_ids_map
+
+    db = _db()
+    rows = [r for r in db.rows() if r["anilist_id"] == args.anilist_id]
+    if not rows:
+        print(f"error: no anime with anilist id {args.anilist_id}")
+        return 1
+    base = rows[0]
+    client = AniListClient()
+    entries = find_franchise_entries(client, args.anilist_id, include_specials=not args.no_specials)
+    ids, by_id = tracked_ids_map(db)
+    mark_tracked_entries(entries, ids, by_id)
+
+    print(f"franchise for {base['english_title']} (anilist {args.anilist_id}):")
+    if not entries:
+        print("  no other seasons/movies found on AniList")
+    for entry in entries:
+        state = "ADDED" if entry.added else "not added"
+        print(
+            f"  [{entry.category:<14}] {entry.display_label():<45} "
+            f"({entry.format}, {entry.relation_type}) anilist {entry.anilist_id} -> {state}"
+        )
+    return 0
+
+
 def cmd_health(args) -> int:
     from .anilist import AniListClient
 
@@ -198,6 +227,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_rm = sub.add_parser("remove", help="remove an anime from the tracker")
     p_rm.add_argument("anilist_id", type=int)
     p_rm.set_defaults(func=cmd_remove)
+
+    p_seasons = sub.add_parser("seasons", help="list other seasons/movies of a show and which are added")
+    p_seasons.add_argument("anilist_id", type=int)
+    p_seasons.add_argument(
+        "--no-specials",
+        action="store_true",
+        help="hide OVA/ONA/specials, keep seasons and movies only",
+    )
+    p_seasons.set_defaults(func=cmd_seasons)
 
     p_health = sub.add_parser("health", help="check AniList + DB + media roots")
     p_health.set_defaults(func=cmd_health)

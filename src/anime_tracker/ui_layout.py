@@ -3,6 +3,7 @@ from __future__ import annotations
 
 MAIN_TOOLBAR_ACTIONS = [
     ("Add Anime", "add_anime"),
+    ("Check Seasons", "check_seasons"),
     ("Check All", "check_all_threaded"),
     ("Scan Jellyfin", "scan_jellyfin_threaded"),
     ("Review Match", "review_match"),

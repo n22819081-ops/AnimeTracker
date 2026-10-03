@@ -62,6 +62,7 @@ from .scanner import (
     scan_roots,
 )
 from .status import is_meaningful_transition, notification_key, tracker_status_from_anilist
+from .seasons import FranchiseEntry, find_franchise_entries, mark_tracked_entries, tracked_ids_map
 from .task_scheduler import (
     build_elevated_scheduled_task_args,
     build_verify_task_args,
@@ -350,6 +351,92 @@ class AnimeTrackerApp:
             self.root.after(0, self.refresh_table)
         except AniListError as exc:
             self.show_error("AniList Error", str(exc))
+
+    def check_seasons(self) -> None:
+        row = self.selected_row()
+        if not row:
+            return
+        self.run_threaded(lambda: self._check_seasons_worker(row))
+
+    def _check_seasons_worker(self, row) -> None:
+        base_id = int(row["anilist_id"])
+        base_title = row["english_title"]
+        try:
+            entries = find_franchise_entries(self.client, base_id)
+        except AniListError as exc:
+            self.show_error("AniList Error", str(exc))
+            return
+        ids, by_id = tracked_ids_map(self.db)
+        mark_tracked_entries(entries, ids, by_id)
+        if not entries:
+            self.root.after(0, lambda: self.show_message(APP_NAME, f"{base_title}: no other seasons or movies found on AniList."))
+            return
+        selected = self._pick_seasons_to_add(base_title, entries)
+        if not selected:
+            return
+        added = 0
+        for entry in selected:
+            media = self.client.get_by_id(entry.anilist_id)
+            status = tracker_status_from_anilist(media.get("status") or "", media.get("format") or "")
+            self.db.upsert_anime(AnimeRecord.from_anilist(media, status))
+            added += 1
+        self.root.after(0, self.refresh_table)
+        self.show_message(APP_NAME, f"Added {added} season(s)/movie(s) for {base_title}. Run Scan Jellyfin to check the server.")
+
+    def _pick_seasons_to_add(self, base_title: str, entries: list[FranchiseEntry]) -> list[FranchiseEntry]:
+        result = {"entries": []}
+        event = threading.Event()
+        category_order = {"Next Season": 0, "Prequel Season": 1, "Movie": 2, "Spin-Off": 3, "Special": 4, "Related": 5}
+
+        def open_dialog():
+            window = Toplevel(self.root)
+            style_window(window, self.theme_choice)
+            window.title(f"Seasons / Movies — {base_title}")
+            window.geometry("700x420")
+            container = ttk.Frame(window)
+            container.pack(fill=BOTH, expand=True)
+            canvas = Canvas(container, highlightthickness=0)
+            vsb = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+            canvas.configure(yscrollcommand=vsb.set)
+            canvas.pack(side=LEFT, fill=BOTH, expand=True)
+            vsb.pack(side=RIGHT, fill=Y)
+            inner = ttk.Frame(canvas)
+            canvas.create_window((0, 0), window=inner, anchor="nw")
+            inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+            vars_by_id = {}
+            ordered = sorted(
+                entries,
+                key=lambda item: (0 if not item.added else 1, category_order.get(item.category, 9), item.season or 999, item.anilist_id),
+            )
+            for entry in ordered:
+                frame = ttk.Frame(inner)
+                frame.pack(fill=X, padx=6, pady=2)
+                variable = BooleanVar(value=not entry.added)
+                label = entry.display_label()
+                if entry.added:
+                    label = f"{label}  (already added)"
+                Checkbutton(frame, text=label, variable=variable).pack(side=LEFT)
+                ttk.Label(frame, text=f"  {entry.category} · {entry.format} · {entry.status or '—'}").pack(side=LEFT)
+                vars_by_id[str(entry.anilist_id)] = (entry, variable)
+
+            def add_selected():
+                result["entries"] = [entry for entry, variable in vars_by_id.values() if variable.get()]
+                window.destroy()
+                event.set()
+
+            def cancel():
+                window.destroy()
+                event.set()
+
+            buttons = ttk.Frame(window)
+            buttons.pack(fill=X, padx=8, pady=8)
+            ttk.Button(buttons, text="Add Selected", command=add_selected).pack(side=LEFT)
+            ttk.Button(buttons, text="Cancel", command=cancel).pack(side=LEFT, padx=(8, 0))
+            window.protocol("WM_DELETE_WINDOW", cancel)
+
+        self.root.after(0, open_dialog)
+        event.wait()
+        return result["entries"]
 
     def choose_match(self, matches):
         result = {"media": None}
