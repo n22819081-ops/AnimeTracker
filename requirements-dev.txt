@@ -1,0 +1,5 @@
+# Dev + build tools: install alongside requirements.txt for tests and the PyInstaller build.
+-r requirements.txt
+pytest>=8.0.0
+pytest-qt>=4.4,<5
+pyinstaller==6.21.0

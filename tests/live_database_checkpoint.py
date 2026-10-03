@@ -1,4 +1,4 @@
 """Shared checkpoint for tests that guard the user-owned legacy database."""
 
-# Re-baselined 2026-09-09 after the 2026-08 cutover and Amagami backfill.
-LIVE_DATABASE_SHA256 = "9FE0AEEEE4F3F133DA4DADF04E1530297B54B07CD5B409A281E0608AF11C2957"
+# Re-baselined 2026-10-03 after routine live-app writes since the 2026-09-09 rebaseline.
+LIVE_DATABASE_SHA256 = "DA3C6F87E088A10324200A911C7E234CBBD9DCCDB7992507F5E6578425E280C7"
