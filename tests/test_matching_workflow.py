@@ -124,6 +124,29 @@ class MatchingWorkflowTests(unittest.TestCase):
             self.assertEqual(db.get(second)["server_status"], SERVER_NOT_FOUND)
             self.assertEqual(db.get(second)["tracker_status"], TRACKER_READY)
 
+    def test_readding_on_server_title_keeps_server_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Database(Path(tmp) / "tracker.db")
+            row_id = db.upsert_anime(record(1001, 2022))
+            db.set_on_server(row_id, "I:\\Jellyfin_Media\\TV\\Shared Franchise (2022)", SERVER_ON_SERVER, event="Server path confirmed")
+            self.assertEqual(db.get(row_id)["tracker_status"], TRACKER_ON_SERVER)
+
+            readded = db.upsert_anime(airing_record(1001, 2022))
+
+            self.assertEqual(readded, row_id)
+            self.assertEqual(db.get(row_id)["tracker_status"], TRACKER_ON_SERVER)
+            self.assertEqual(db.get(row_id)["airing_status"], "RELEASING")
+
+    def test_readding_non_server_title_recomputes_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Database(Path(tmp) / "tracker.db")
+            row_id = db.upsert_anime(record(1001, 2022))
+            self.assertEqual(db.get(row_id)["tracker_status"], TRACKER_READY)
+
+            db.upsert_anime(airing_record(1001, 2022))
+
+            self.assertEqual(db.get(row_id)["tracker_status"], TRACKER_AIRING)
+
     def test_rejecting_future_season_removes_confirmation_and_persists(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -78,8 +78,10 @@ def cmd_add(args) -> int:
     )
     record = AnimeRecord.from_anilist(payload, status)
     db = _db()
+    already_tracked = db.get_anime_by_anilist_id(record.anilist_id) is not None
     row_id = db.upsert_anime(record)
-    print(f"added: {record.english_title} (anilist {record.anilist_id}, row {row_id}) [{source}]")
+    verb = "updated existing entry for" if already_tracked else "added"
+    print(f"{verb}: {record.english_title} (anilist {record.anilist_id}, row {row_id}) [{source}] status={status}")
 
     if args.no_scan:
         print("scan skipped (--no-scan)")

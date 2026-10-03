@@ -346,9 +346,15 @@ class AnimeTrackerApp:
                 if media is None:
                     return
             status = tracker_status_from_anilist(media.get("status") or "", media.get("format") or "")
-            record = AnimeRecord.from_anilist(media, status)
-            self.db.upsert_anime(record)
+            title = media.get("title", {}).get("english") or media.get("title", {}).get("romaji") or "Unknown"
+            existing = self.db.get_anime_by_anilist_id(int(media.get("id")))
+            self.db.upsert_anime(AnimeRecord.from_anilist(media, status))
+            verb = "Updated existing entry for" if existing else "Added"
+            message = f"{verb} {title} — {status}."
+            if not existing and status != TRACKER_ON_SERVER:
+                message += " Run Scan Jellyfin to check the server."
             self.root.after(0, self.refresh_table)
+            self.root.after(0, lambda: self.show_message(APP_NAME, message))
         except AniListError as exc:
             self.show_error("AniList Error", str(exc))
 
@@ -375,13 +381,19 @@ class AnimeTrackerApp:
         if not selected:
             return
         added = 0
+        already_tracked = 0
         for entry in selected:
             media = self.client.get_by_id(entry.anilist_id)
             status = tracker_status_from_anilist(media.get("status") or "", media.get("format") or "")
+            already_tracked += 1 if self.db.get_anime_by_anilist_id(entry.anilist_id) else 0
             self.db.upsert_anime(AnimeRecord.from_anilist(media, status))
             added += 1
         self.root.after(0, self.refresh_table)
-        self.show_message(APP_NAME, f"Added {added} season(s)/movie(s) for {base_title}. Run Scan Jellyfin to check the server.")
+        message = f"Added {added} season(s)/movie(s) for {base_title}."
+        if already_tracked:
+            message += f" {already_tracked} already tracked."
+        message += " Run Scan Jellyfin to check the server."
+        self.show_message(APP_NAME, message)
 
     def _pick_seasons_to_add(self, base_title: str, entries: list[FranchiseEntry]) -> list[FranchiseEntry]:
         result = {"entries": []}

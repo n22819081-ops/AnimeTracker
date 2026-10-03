@@ -405,13 +405,15 @@ class Database:
         now = datetime.now().isoformat(timespec="seconds")
         with self.connect() as connection:
             existing = connection.execute(
-                "SELECT id, date_added FROM anime WHERE anilist_id = ?",
+                "SELECT id, date_added, tracker_status FROM anime WHERE anilist_id = ?",
                 (record.anilist_id,),
             ).fetchone()
             date_added = existing["date_added"] if existing else now
             payload = self._record_values(record, date_added, now)
             if existing:
                 payload["id"] = existing["id"]
+                if existing["tracker_status"] == TRACKER_ON_SERVER:
+                    payload["tracker_status"] = existing["tracker_status"]
                 connection.execute(
                     """
                     UPDATE anime SET
@@ -652,6 +654,10 @@ class Database:
     def confirmed_match_for(self, anilist_id: int) -> sqlite3.Row | None:
         with self.connect() as connection:
             return connection.execute("SELECT * FROM server_matches WHERE anilist_id=?", (anilist_id,)).fetchone()
+
+    def get_anime_by_anilist_id(self, anilist_id: int) -> sqlite3.Row | None:
+        with self.connect() as connection:
+            return connection.execute("SELECT * FROM anime WHERE anilist_id=?", (anilist_id,)).fetchone()
 
     def remove_confirmed_match(self, anilist_id: int, path: str = "") -> None:
         with self.connect() as connection:
